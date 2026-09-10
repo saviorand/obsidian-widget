@@ -410,12 +410,23 @@ class VaultManager(private val context: Context, private val widgetId: Int = -1)
         return current
     }
 
+    /**
+     * Set whenever [readFileContent] fails, so a caller can show *why* a note
+     * came back empty instead of a silent blank — a permission that didn't
+     * persist and a genuinely empty file look identical otherwise.
+     */
+    var lastReadError: String? = null
+        private set
+
     private fun readFileContent(uri: Uri): String? {
         return try {
-            context.contentResolver.openInputStream(uri)?.use { inputStream ->
+            val text = context.contentResolver.openInputStream(uri)?.use { inputStream ->
                 BufferedReader(InputStreamReader(inputStream)).readText()
             }
+            lastReadError = null
+            text
         } catch (e: Exception) {
+            lastReadError = "${e.javaClass.simpleName}: ${e.message}"
             null
         }
     }
@@ -493,6 +504,34 @@ class VaultManager(private val context: Context, private val widgetId: Int = -1)
         lines[lineIndex] = "$indent- [$newState] $text"
 
         return writeFileContent(noteUri, lines.joinToString("\n"))
+    }
+
+    /**
+     * Replace the entire contents of the currently displayed widget note.
+     * Creates the daily note file if it doesn't exist yet; a pinned note
+     * must already exist (it was picked via SAF, so it always does).
+     */
+    fun writeWidgetNote(content: String): Boolean {
+        return when (noteMode) {
+            NoteMode.PINNED -> {
+                val uri = getCurrentPinnedNoteUri() ?: return false
+                writeFileContent(uri, content)
+            }
+            NoteMode.DAILY -> {
+                val vault = vaultUri ?: return false
+                val rootDoc = DocumentFile.fromTreeUri(context, vault) ?: return false
+                val todayFileName = getTodayFileName()
+                val targetDir = if (dailyFolder.isNotBlank()) {
+                    findOrCreateSubDirectory(rootDoc, dailyFolder)
+                } else {
+                    rootDoc
+                } ?: return false
+                val file = targetDir.findFile(todayFileName)
+                    ?: targetDir.createFile("text/markdown", todayFileName)
+                    ?: return false
+                writeFileContent(file.uri, content)
+            }
+        }
     }
 
     /**

@@ -18,6 +18,7 @@ class ObsidianWidgetProvider : AppWidgetProvider() {
     companion object {
         private const val ACTION_REFRESH = "com.obsidianwidget.ACTION_REFRESH"
         private const val ACTION_CAPTURE = "com.obsidianwidget.ACTION_CAPTURE"
+        private const val ACTION_EDIT = "com.obsidianwidget.ACTION_EDIT"
         private const val ACTION_OPEN = "com.obsidianwidget.ACTION_OPEN"
         private const val ACTION_TOGGLE = "com.obsidianwidget.ACTION_TOGGLE"
         private const val ACTION_ADD = "com.obsidianwidget.ACTION_ADD"
@@ -78,6 +79,14 @@ class ObsidianWidgetProvider : AppWidgetProvider() {
                     putExtra(EXTRA_WIDGET_ID, widgetId)
                 }
                 context.startActivity(addIntent)
+            }
+            ACTION_EDIT -> {
+                val widgetId = intent.getIntExtra(EXTRA_WIDGET_ID, -1)
+                val editIntent = Intent(context, EditNoteActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    putExtra(EXTRA_WIDGET_ID, widgetId)
+                }
+                context.startActivity(editIntent)
             }
             ACTION_OPEN -> {
                 val widgetId = intent.getIntExtra(EXTRA_WIDGET_ID, -1)
@@ -141,8 +150,10 @@ class ObsidianWidgetProvider : AppWidgetProvider() {
             views.setViewVisibility(R.id.widget_todo_count, View.GONE)
         }
 
-        if (hasChecklist) {
-            // Show interactive checklist ListView
+        if (allItems.isNotEmpty()) {
+            // Any note with content — checklist or plain prose alike — goes
+            // through the ListView. RemoteViews has no ScrollView, so this is
+            // also what makes a plain note's preview actually scroll.
             views.setViewVisibility(R.id.widget_checklist, View.VISIBLE)
             views.setViewVisibility(R.id.widget_note_preview, View.GONE)
 
@@ -168,20 +179,23 @@ class ObsidianWidgetProvider : AppWidgetProvider() {
             appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetId, R.id.widget_checklist)
 
         } else {
-            // Show plain text preview
+            // Nothing to list: not configured, no note picked, an empty file,
+            // or a read error. parseChecklist() already attempted a read above,
+            // so lastReadError (if any) is already set.
             views.setViewVisibility(R.id.widget_checklist, View.GONE)
             views.setViewVisibility(R.id.widget_note_preview, View.VISIBLE)
 
-            if (vaultManager.isVaultConfigured || vaultManager.noteMode == VaultManager.NoteMode.PINNED) {
-                val noteContent = vaultManager.readWidgetNote()
-                val preview = noteContent?.take(500) ?: context.getString(R.string.no_daily_note)
-                views.setTextViewText(R.id.widget_note_preview, preview)
-            } else {
-                views.setTextViewText(
-                    R.id.widget_note_preview,
+            val message = when {
+                vaultManager.noteMode == VaultManager.NoteMode.PINNED && vaultManager.getWidgetNoteUri() == null ->
+                    "No note selected — tap the wrench to configure"
+                !vaultManager.isVaultConfigured && vaultManager.noteMode == VaultManager.NoteMode.DAILY ->
                     context.getString(R.string.no_vault_selected)
-                )
+                vaultManager.lastReadError != null ->
+                    "Can't read note:\n${vaultManager.lastReadError}"
+                else ->
+                    context.getString(R.string.no_daily_note)
             }
+            views.setTextViewText(R.id.widget_note_preview, message)
         }
 
         // Add to note button
@@ -232,6 +246,12 @@ class ObsidianWidgetProvider : AppWidgetProvider() {
             createActionIntent(context, ACTION_CAPTURE, appWidgetId)
         )
 
+        // Edit (pencil) button — full-note plain-text editor
+        views.setOnClickPendingIntent(
+            R.id.widget_edit,
+            createActionIntent(context, ACTION_EDIT, appWidgetId)
+        )
+
         // Show/hide button bar based on setting
         views.setViewVisibility(
             R.id.widget_button_bar,
@@ -260,6 +280,7 @@ class ObsidianWidgetProvider : AppWidgetProvider() {
         views.setInt(R.id.widget_refresh, "setColorFilter", colors.text)
         views.setInt(R.id.widget_settings, "setColorFilter", colors.text)
         views.setInt(R.id.widget_cycle_note, "setColorFilter", colors.text)
+        views.setInt(R.id.widget_edit, "setColorFilter", colors.text)
 
         // Tint accent-colored buttons (preserves rounded drawable shape)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -308,10 +329,15 @@ class ObsidianWidgetProvider : AppWidgetProvider() {
                         .appendQueryParameter("vault", vaultName)
                         .appendQueryParameter("file", noteName)
                         .build()
+                    // Obsidian's MainActivity is launchMode="singleTask" (checked
+                    // its manifest), so CLEAR_TOP/SINGLE_TOP alone just resurface
+                    // the existing window via onNewIntent — which doesn't actually
+                    // navigate to the newly requested file. CLEAR_TASK forces a
+                    // full restart so the deep link is processed like a cold start,
+                    // at the cost of losing whatever Obsidian had open before.
                     val deepLinkIntent = Intent(Intent.ACTION_VIEW, obsidianUri).apply {
                         flags = Intent.FLAG_ACTIVITY_NEW_TASK or
-                                Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                                Intent.FLAG_ACTIVITY_SINGLE_TOP
+                                Intent.FLAG_ACTIVITY_CLEAR_TASK
                     }
                     context.startActivity(deepLinkIntent)
                     return

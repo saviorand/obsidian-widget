@@ -28,4 +28,9 @@
     <string name="no_note_selected">No note selected</string>
     <string name="select_note">Pick Note</string>
     <string name="note_selected">%s</string>
+
+    <string name="agent_widget_description">Chat with your Claude Code agent, backed by agent-host.mjs</string>
+    <string name="agent_widget_placeholder">Tap to ask…</string>
+    <string name="send">Send</string>
+    <string name="stop">Stop</string>
 </resources>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- agent-host.mjs listens on plain ws:// on loopback only (Termux, same
+         device). Scoped to localhost rather than a blanket
+         usesCleartextTraffic so nothing else the app talks to gets this. -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>
