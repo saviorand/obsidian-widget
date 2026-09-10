@@ -74,33 +74,46 @@ be dropped straight into AIO's own directory. Instead:
 ## Panels — fully agent-programmable content
 
 `obsidian-panel-1/2/3/4.lua` have no native widget binding at all — they
-just render whatever text the agent last pushed, via `am broadcast`:
+render whatever the agent last pushed via `am broadcast`, in one of three
+modes selected by the first line of the pushed command:
 
-```
-am broadcast -a ru.execbit.aiolauncher.COMMAND \
-  --es cmd "script:panel 1:<title>
-<body line 1>
-<body line 2>..."
-```
+- **text** (default) — title + body lines, HTML tags allowed, optional
+  leading `@<vault-relative-path>` line to make the whole panel tappable
+  (opens that note in the real editor — reuses `EditNoteActivity` via
+  `ObsidianWidgetProvider`'s `ACTION_EDIT`, extended with an optional
+  `note_path` extra since a panel has no bound widget instance to key
+  off).
+- **chart** (`chart:<json>`) — a real line chart via AIO's own
+  `ui:show_chart()`: `{"points":[[timestamp_ms,value],...],
+  "format":"x:date y:number","title":"...","show_grid":true}`.
+- **layout** (`layout:<json>`) — AIO's full declarative rich-UI element
+  language (`README_RICH_UI.md` in `~/aiolauncher_scripts`): text,
+  buttons, icons (including FontAwesome and custom SVGs), progress bars —
+  sized, colored, precisely positioned. `{"elements":[[...],[...]],
+  "actions":{"<element index>":"@<path>"}}` — `elements` passes straight
+  into `gui{}` (a JSON array of tuples decodes to exactly the Lua table
+  shape `gui{}` expects, no translation needed), `actions` maps a
+  1-based element index to a note path to open on tap.
 
-`"script:panel 1:clear"` resets it. A leading `@<vault-relative-path>`
-line makes the whole panel tappable, opening that note in the real editor
-(reuses `EditNoteActivity` via `ObsidianWidgetProvider`'s `ACTION_EDIT`,
-extended with an optional `note_path` extra for exactly this — a
-broadcaster with no bound widget instance couldn't otherwise say which
-note to open). See the script's own header comment for the exact escaping
-notes (use a real embedded newline in the `--es` value, not the two
+`"clear"` resets a panel to its placeholder text state. See the script's
+own header comment for exact command examples and escaping notes (a real
+embedded newline in the `--es` value for text mode, not the two
 characters `\n`).
 
-This is the actual answer to "one universal, hot-swappable widget type":
-the agent already reads the vault directly with its own tools, so it can
-compute *anything* — a note's content, a summary across several notes, a
-checklist it formats itself, an agent-chat digest — and push the finished
-text here. Content slots (below) are still the better fit specifically
-for a checklist you want to tap individual items on, since only a widget
-bound to the real native provider has real per-row click targets; a panel
-has exactly one tap action for the whole thing (open the linked note, if
-any).
+This is the actual answer to "one universal, hot-swappable widget whose
+content is fully programmable": the agent already reads the vault
+directly with its own tools, so it can compute *anything* — a note's
+content, a summary across several notes, a chart of some tracked metric,
+a whole custom layout with buttons and icons — and push the result here.
+It is not a live web renderer: RemoteViews-style Android widgets and
+AIO's own script sandbox both exclude WebView, so literal React/Ant
+Design can't run inside a panel — `gui{}`'s element language is AIO's own
+equivalent expressive layer, not a DOM. Content slots (below) are still
+the better fit specifically for a checklist you want to tap individual
+items on, since only a widget bound to the real native provider has real
+per-row click targets tied to the actual note file; a panel's clickable
+surface is whatever `actions` you declare (or one linked note, in text
+mode).
 
 ## Content slots
 

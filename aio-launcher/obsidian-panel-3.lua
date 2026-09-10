@@ -1,49 +1,56 @@
 -- name = "Panel 3"
--- description = "Fully agent-programmable content panel -- push any text, the agent decides what's shown"
+-- description = "Fully agent-programmable content panel -- text, charts, or a full declarative layout"
 -- type = "widget"
--- version = "1.0"
+-- version = "2.0"
 -- aio_version = "7.5.0-beta2"
 -- uses_app = "com.obsidianwidget"
 
 -- No native widget binding at all -- unlike obsidian-note.lua, this panel
 -- doesn't read any specific vault file itself. The agent already has
--- direct filesystem access to the vault (it's just reading local files
--- with its own tools), so it computes whatever should be shown -- a note's
--- content, a summary across several notes, a checklist it renders itself,
--- an agent-chat digest, anything -- and pushes the finished text here in
--- one broadcast. This panel has no opinion about what content is.
+-- direct filesystem access to the vault, so it computes whatever should be
+-- shown and pushes the finished result here in one broadcast. Three modes,
+-- selected by the first line of the pushed command:
 --
+-- TEXT (default, no prefix) -- title + body lines, HTML tags allowed:
 --   am broadcast -a ru.execbit.aiolauncher.COMMAND \
 --     --es cmd "script:panel 1:<title>
 -- <body line 1>
--- <body line 2>
--- ..."
+-- <body line 2>"
+--   A leading "@<vault-relative-path>" line makes the whole panel tappable
+--   (opens that note in the real editor).
 --
+-- CHART -- a real line chart (AIO's ui:show_chart), JSON on the rest of
+-- the line after "chart:":
 --   am broadcast -a ru.execbit.aiolauncher.COMMAND \
---     --es cmd "script:panel 1:clear"
+--     --es cmd 'script:panel 1:chart:{"points":[[1700000000000,3],[1700086400000,5]],"format":"x:date y:number","title":"Tasks done","show_grid":true}'
+--   points are [timestamp_ms, value] pairs; format/title/show_grid optional.
 --
--- To make the whole panel tappable (opens the real note editor on that
--- vault-relative path), prefix with an "@" line:
---
+-- LAYOUT -- AIO's full declarative rich-UI element language (see
+-- README_RICH_UI.md in ~/aiolauncher_scripts): any text/button/icon/
+-- progress element, sized, colored, positioned -- as close to "any
+-- layout" as this platform gets without a live web renderer (RemoteViews-
+-- style Android widgets and AIO's own sandbox both exclude WebView, so
+-- literal React/Ant Design can't run live here; this is AIO's own
+-- equivalent expressive layer instead). JSON array of element tuples,
+-- passed through to `gui{}` almost verbatim -- each JSON array becomes a
+-- Lua table, so a spec written to match the gui{} examples in
+-- README_RICH_UI.md works with no translation:
 --   am broadcast -a ru.execbit.aiolauncher.COMMAND \
---     --es cmd "script:panel 1:@Todo.md
--- Todo
--- - [ ] first item
--- - [x] second item"
+--     --es cmd 'script:panel 1:layout:{"elements":[["text","<b>Tasks</b>",{"size":20}],["new_line",2],["progress","Today",{"progress":70}],["new_line",2],["button","Open Todo",{"color":"#00aa00"}]],"actions":{"3":"@Todo.md"}}'
+--   "actions" maps a 1-based element index (matching on_click's argument)
+--   to "@<vault-relative-path>" to open on tap -- only elements you list
+--   there are clickable in a way that does anything.
+--
+-- "clear" resets to the placeholder text state.
 --
 -- (--es values can contain literal newlines -- construct the string with
--- $'...'  or a quoted heredoc, not string concatenation with "\n" as two
--- characters.) "clear" is the one reserved first line; anything else is
--- treated as real content starting from line 1 (or line 2, if line 1 is
--- an "@path" link marker).
---
--- Multiple panels (Panel 1-4) exist as separate instances -- most folded
--- via obsidian-controller.lua -- exactly like the note/content-slot
--- widgets, but each can show literally anything instead of only a bound
--- note's content. Use whichever fits: a content slot for a checklist you
--- want to tap individual items on, a panel for anything else.
+-- $'...' or a heredoc, not two-character "\n" escapes; JSON values are
+-- single-line and don't need this.)
 
 local prefs = require "prefs"
+local json = require "json"
+
+local click_actions = {}
 
 local function split_lines(s)
     local lines = {}
@@ -53,7 +60,15 @@ local function split_lines(s)
     return lines
 end
 
-local function render()
+local function open_note(path)
+    intent:send_broadcast{
+        action = "com.obsidianwidget.ACTION_EDIT",
+        component = "com.obsidianwidget/com.obsidianwidget.ObsidianWidgetProvider",
+        extras = { note_path = path },
+    }
+end
+
+local function render_text()
     local title = prefs.panel_title or "Panel"
     local body = prefs.panel_body or "(nothing pushed yet)"
     local lines = { "<b>" .. title .. "</b>" }
@@ -63,15 +78,65 @@ local function render()
     ui:show_lines(lines)
 end
 
+local function render_chart()
+    local ok, spec = pcall(json.decode, prefs.panel_payload or "{}")
+    if not ok or spec == nil or spec.points == nil then
+        ui:show_text("Bad chart data")
+        return
+    end
+    ui:show_chart(spec.points, spec.format, spec.title, spec.show_grid)
+end
+
+local function render_layout()
+    local ok, spec = pcall(json.decode, prefs.panel_payload or "{}")
+    if not ok or spec == nil or spec.elements == nil then
+        ui:show_text("Bad layout data")
+        return
+    end
+    click_actions = spec.actions or {}
+    local ok2, built = pcall(gui, spec.elements)
+    if not ok2 then
+        ui:show_text("Layout error: " .. tostring(built))
+        return
+    end
+    built.render()
+end
+
+local function render()
+    local mode = prefs.panel_mode or "text"
+    if mode == "chart" then render_chart()
+    elseif mode == "layout" then render_layout()
+    else render_text() end
+end
+
 function on_command(cmd)
     if cmd == "clear" then
+        prefs.panel_mode = "text"
         prefs.panel_title = nil
         prefs.panel_body = nil
         prefs.panel_link = nil
+        prefs.panel_payload = nil
+        click_actions = {}
         render()
         return
     end
 
+    if cmd:starts_with("chart:") then
+        prefs.panel_mode = "chart"
+        prefs.panel_payload = cmd:sub(("chart:"):len() + 1)
+        render()
+        return
+    end
+
+    if cmd:starts_with("layout:") then
+        prefs.panel_mode = "layout"
+        prefs.panel_payload = cmd:sub(("layout:"):len() + 1)
+        render()
+        return
+    end
+
+    -- Default: text mode.
+    prefs.panel_mode = "text"
     local lines = split_lines(cmd)
     local i = 1
     local link = nil
@@ -92,13 +157,17 @@ end
 function on_load() render() end
 function on_resume() render() end
 
-function on_click()
-    local link = prefs.panel_link
-    if link ~= nil and link ~= "" then
-        intent:send_broadcast{
-            action = "com.obsidianwidget.ACTION_EDIT",
-            component = "com.obsidianwidget/com.obsidianwidget.ObsidianWidgetProvider",
-            extras = { note_path = link },
-        }
+function on_click(idx)
+    local mode = prefs.panel_mode or "text"
+    if mode == "text" then
+        local link = prefs.panel_link
+        if link ~= nil and link ~= "" then open_note(link) end
+        return
+    end
+    if mode == "layout" and idx ~= nil then
+        local action = click_actions[tostring(idx)]
+        if action ~= nil and action:starts_with("@") then
+            open_note(action:sub(2))
+        end
     end
 end
