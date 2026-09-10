@@ -1,77 +1,78 @@
 -- name = "Panel 1"
--- description = "Fully agent-programmable content panel -- text, charts, or a full declarative layout"
+-- description = "Fully agent-programmable content panel -- text, charts, or a full declarative layout, with a general tap-action vocabulary"
 -- type = "widget"
--- version = "2.1"
+-- version = "3.0"
 -- aio_version = "7.5.0-beta2"
 -- uses_app = "com.obsidianwidget"
 -- on_resume_when_folding = "true"
 
 -- No native widget binding at all -- unlike obsidian-note.lua, this panel
--- doesn't read any specific vault file itself. The agent already has
--- direct filesystem access to the vault, so it computes whatever should be
--- shown and pushes the finished result here in one broadcast. Three modes,
--- selected by the first line of the pushed command:
+-- doesn't read any specific vault file itself, and doesn't go through
+-- AIO's widgets:setup()/bridge:snapshot() at all (confirmed unreliable
+-- beyond the very first widget ever bound in an AIO session -- see
+-- aio-launcher/README.md's "Content slots" section). The agent already
+-- has direct filesystem access to the vault, so it computes whatever
+-- should be shown and pushes the finished result here in one broadcast.
 --
--- IMPORTANT: the identifier AIO routes on_command by is the script's
--- literal FILENAME including the ".lua" extension -- "obsidian-panel-1.lua"
--- below, not "Panel 1" (confirmed on-device; contradicts what AIO's own
--- samples/tasker-widget-control.lua implies). Same identifier
--- obsidian-controller.lua's add/remove/move/fold ops expect.
+-- ONE JSON envelope for everything (v3 -- replaces the old chart:/layout:
+-- text-prefix protocol):
 --
--- TEXT (default, no prefix) -- title + body lines, HTML tags allowed:
 --   am broadcast -a ru.execbit.aiolauncher.COMMAND \
---     --es cmd "script:obsidian-panel-1.lua:<title>
--- <body line 1>
--- <body line 2>"
---   A leading "@<vault-relative-path>" line makes the whole panel tappable
---   (opens that note in the real editor).
+--     --es cmd '{"mode":"text","title":"...","body":"line1\nline2","action":"open:Todo.md"}'
 --
--- CHART -- a real line chart (AIO's ui:show_chart), JSON on the rest of
--- the line after "chart:":
 --   am broadcast -a ru.execbit.aiolauncher.COMMAND \
---     --es cmd 'script:obsidian-panel-1.lua:chart:{"points":[[1700000000000,3],[1700086400000,5]],"format":"x:date y:number","title":"Tasks done","show_grid":true}'
---   points are [timestamp_ms, value] pairs; format/title/show_grid optional.
+--     --es cmd '{"mode":"chart","points":[[ts_ms,value],...],"format":"x:date y:number","title":"...","show_grid":true,"action":"open:X.md"}'
 --
--- LAYOUT -- AIO's full declarative rich-UI element language (see
--- README_RICH_UI.md in ~/aiolauncher_scripts): any text/button/icon/
--- progress element, sized, colored, positioned -- as close to "any
--- layout" as this platform gets without a live web renderer (RemoteViews-
--- style Android widgets and AIO's own sandbox both exclude WebView, so
--- literal React/Ant Design can't run live here; this is AIO's own
--- equivalent expressive layer instead). JSON array of element tuples,
--- passed through to `gui{}` almost verbatim -- each JSON array becomes a
--- Lua table, so a spec written to match the gui{} examples in
--- README_RICH_UI.md works with no translation, with ONE gotcha confirmed
--- on-device: every element tuple MUST include its options table
--- explicitly, even if empty ([..., {}]) -- omitting it (a bare
--- ["text","..."] with no third item, valid in a native Lua literal per
--- README_RICH_UI.md's own first example) throws a LuaJ argument-coercion
--- error from gui{}'s internals when the tuple comes from json.decode
--- instead of a Lua table constructor.
 --   am broadcast -a ru.execbit.aiolauncher.COMMAND \
---     --es cmd 'script:obsidian-panel-1.lua:layout:{"elements":[["text","<b>Tasks</b>",{"size":20}],["new_line",2],["progress","Today",{"progress":70}],["new_line",2],["button","Open Todo",{"color":"#00aa00"}]],"actions":{"3":"@Todo.md"}}'
---   "actions" maps a 1-based element index (matching on_click's argument)
---   to "@<vault-relative-path>" to open on tap -- only elements you list
---   there are clickable in a way that does anything.
+--     --es cmd '{"mode":"layout","elements":[["text","<b>Tasks</b>",{"size":20}],["new_line",2],["button","Open Todo",{"color":"#00aa00"}]],"actions":{"2":"open:Todo.md"}}'
 --
--- "clear" resets to the placeholder text state.
+--   am broadcast -a ru.execbit.aiolauncher.COMMAND --es cmd '{"mode":"clear"}'
 --
--- (--es values can contain literal newlines -- construct the string with
--- $'...' or a heredoc, not two-character "\n" escapes; JSON values are
--- single-line and don't need this.)
+-- (Real script name goes after "script:" in the actual cmd extra --
+-- "script:obsidian-panel-1.lua:<json>" -- shortened above for space; see
+-- the vault's CLAUDE.md for the full command shape. AIO routes by the
+-- script's literal FILENAME including ".lua", confirmed on-device --
+-- not the "-- name =" title.)
+--
+-- LAYOUT mode notes: `elements` passes straight into AIO's `gui{}`
+-- (README_RICH_UI.md in ~/aiolauncher_scripts) -- a JSON array of tuples
+-- is exactly the Lua table shape it expects. ALWAYS give every tuple an
+-- explicit options table, even `{}` -- `["text","...",{}]`, never
+-- `["text","..."]` -- confirmed on-device that omitting it throws a LuaJ
+-- coercion error for a JSON-decoded tuple, even though AIO's own docs
+-- show the bare 2-item form as valid (only true for a native Lua literal).
+--
+-- ACTION VOCABULARY -- text/chart get one `action` (the whole panel is
+-- the tap target); layout gets `actions`, a map from 1-based element
+-- index (matching on_click's argument) to the same verb:arg strings:
+--
+--   open:<vault-relative-path>       opens that note in the real editor
+--   broadcast:<json>                 sends an arbitrary Android broadcast,
+--                                    json = {"action":"...","component":"...",
+--                                    "extras":{...}} (component optional)
+--   agent:<free text>                forwards the text as a fresh prompt
+--                                    to agent-host.mjs (the same daemon
+--                                    the chat widget uses) via
+--                                    AgentTriggerReceiver -- for anything
+--                                    needing real judgment rather than a
+--                                    fixed effect. Fire-and-forget: the
+--                                    agent's own actions (editing a file,
+--                                    pushing updated panel content) are
+--                                    the visible result, not a reply here.
+--
+-- (--es values can contain literal newlines for body text -- construct
+-- the string with $'...' or a heredoc, not two-character "\n" escapes.)
 
 local prefs = require "prefs"
 local json = require "json"
 
 local click_actions = {}
-
-local function split_lines(s)
-    local lines = {}
-    for line in (s .. "\n"):gmatch("(.-)\n") do
-        table.insert(lines, line)
-    end
-    return lines
-end
+-- text/chart modes have exactly one tap target for the WHOLE panel,
+-- regardless of which rendered line was tapped (ui:show_lines()/
+-- show_chart() don't give per-line click indices the way gui{} does) --
+-- kept separate from click_actions (layout mode's per-element map) so a
+-- tap on any line of a multi-line text panel still fires the one action.
+local mode_action = nil
 
 local function open_note(path)
     intent:send_broadcast{
@@ -81,34 +82,69 @@ local function open_note(path)
     }
 end
 
-local function render_text()
-    local title = prefs.panel_title or "Panel"
-    local body = prefs.panel_body or "(nothing pushed yet)"
+local function send_broadcast_action(arg)
+    local ok, spec = pcall(json.decode, arg)
+    if not ok or type(spec) ~= "table" or spec.action == nil then return end
+    intent:send_broadcast{
+        action = spec.action,
+        component = spec.component,
+        extras = spec.extras or {},
+    }
+end
+
+local function send_agent_signal(text)
+    intent:send_broadcast{
+        action = "com.obsidianwidget.aio.ACTION_AGENT_SIGNAL",
+        component = "com.obsidianwidget/com.obsidianwidget.AgentTriggerReceiver",
+        extras = { payload = text, panel = aio:self_name() },
+    }
+end
+
+local function dispatch_action(action)
+    if action == nil or action == "" then return end
+    local verb, rest = action:match("^([%a_]+):(.*)$")
+    if verb == "open" then
+        open_note(rest)
+    elseif verb == "broadcast" then
+        send_broadcast_action(rest)
+    elseif verb == "agent" then
+        send_agent_signal(rest)
+    end
+end
+
+local function split_lines(s)
+    local lines = {}
+    for line in (s .. "\n"):gmatch("(.-)\n") do
+        table.insert(lines, line)
+    end
+    return lines
+end
+
+local function render_text(spec)
+    local title = spec.title or "Panel"
     local lines = { "<b>" .. title .. "</b>" }
-    for _, l in ipairs(split_lines(body)) do
+    for _, l in ipairs(split_lines(spec.body or "")) do
         table.insert(lines, l)
     end
     ui:show_lines(lines)
 end
 
-local function render_chart()
-    local ok, spec = pcall(json.decode, prefs.panel_payload or "{}")
-    if not ok or spec == nil or spec.points == nil then
+local function render_chart(spec)
+    if spec.points == nil then
         ui:show_text("Bad chart data")
         return
     end
     ui:show_chart(spec.points, spec.format, spec.title, spec.show_grid)
 end
 
-local function render_layout()
-    local ok, spec = pcall(json.decode, prefs.panel_payload or "{}")
-    if not ok or spec == nil or spec.elements == nil then
+local function render_layout(spec)
+    if spec.elements == nil then
         ui:show_text("Bad layout data")
         return
     end
     click_actions = spec.actions or {}
-    local ok2, built = pcall(gui, spec.elements)
-    if not ok2 then
+    local ok, built = pcall(gui, spec.elements)
+    if not ok then
         ui:show_text("Layout error: " .. tostring(built))
         return
     end
@@ -116,63 +152,58 @@ local function render_layout()
 end
 
 local function render()
-    -- chart/layout rendering doesn't go through AIO's line-based UI, so it
-    -- doesn't participate in the launcher's automatic "show first line when
-    -- folded" behavior the way ui:show_lines() does -- fold left the full
-    -- chart/layout visible. on_resume_when_folding (metadata above) makes
-    -- on_resume fire on every fold/unfold, so render explicitly nothing here.
+    -- chart/layout rendering doesn't go through AIO's line-based ui
+    -- module, so it doesn't participate in the launcher's automatic
+    -- "show first line when folded" behavior the way ui:show_lines() does
+    -- -- fold alone left the full chart/layout visible.
+    -- on_resume_when_folding (metadata above) makes on_resume fire on
+    -- every fold/unfold, so render explicitly nothing here when folded.
     if ui:is_folded() then
         ui:show_text("")
         return
     end
-    local mode = prefs.panel_mode or "text"
-    if mode == "chart" then render_chart()
-    elseif mode == "layout" then render_layout()
-    else render_text() end
+
+    local raw = prefs.panel_spec
+    if raw == nil then
+        mode_action = nil
+        click_actions = {}
+        ui:show_text("(nothing pushed yet)")
+        return
+    end
+    local ok, spec = pcall(json.decode, raw)
+    if not ok or type(spec) ~= "table" then
+        mode_action = nil
+        click_actions = {}
+        ui:show_text("Bad panel spec")
+        return
+    end
+
+    if spec.mode == "layout" then
+        mode_action = nil
+        render_layout(spec)
+    elseif spec.mode == "chart" then
+        mode_action = spec.action
+        click_actions = {}
+        render_chart(spec)
+    else
+        mode_action = spec.action
+        click_actions = {}
+        render_text(spec)
+    end
 end
 
 function on_command(cmd)
-    if cmd == "clear" then
-        prefs.panel_mode = "text"
-        prefs.panel_title = nil
-        prefs.panel_body = nil
-        prefs.panel_link = nil
-        prefs.panel_payload = nil
-        click_actions = {}
+    local ok, spec = pcall(json.decode, cmd)
+    if not ok or type(spec) ~= "table" then
+        ui:show_text("Bad command (expected JSON)")
+        return
+    end
+    if spec.mode == "clear" then
+        prefs.panel_spec = nil
         render()
         return
     end
-
-    if cmd:starts_with("chart:") then
-        prefs.panel_mode = "chart"
-        prefs.panel_payload = cmd:sub(("chart:"):len() + 1)
-        render()
-        return
-    end
-
-    if cmd:starts_with("layout:") then
-        prefs.panel_mode = "layout"
-        prefs.panel_payload = cmd:sub(("layout:"):len() + 1)
-        render()
-        return
-    end
-
-    -- Default: text mode.
-    prefs.panel_mode = "text"
-    local lines = split_lines(cmd)
-    local i = 1
-    local link = nil
-    if lines[1] and lines[1]:starts_with("@") then
-        link = lines[1]:sub(2)
-        i = 2
-    end
-    prefs.panel_link = link
-    prefs.panel_title = lines[i] or "Panel"
-    local body_lines = {}
-    for j = i + 1, #lines do
-        table.insert(body_lines, lines[j])
-    end
-    prefs.panel_body = table.concat(body_lines, "\n")
+    prefs.panel_spec = cmd
     render()
 end
 
@@ -180,16 +211,9 @@ function on_load() render() end
 function on_resume() render() end
 
 function on_click(idx)
-    local mode = prefs.panel_mode or "text"
-    if mode == "text" then
-        local link = prefs.panel_link
-        if link ~= nil and link ~= "" then open_note(link) end
+    if mode_action ~= nil then
+        dispatch_action(mode_action)
         return
     end
-    if mode == "layout" and idx ~= nil then
-        local action = click_actions[tostring(idx)]
-        if action ~= nil and action:starts_with("@") then
-            open_note(action:sub(2))
-        end
-    end
+    dispatch_action(click_actions[tostring(idx or 1)])
 end

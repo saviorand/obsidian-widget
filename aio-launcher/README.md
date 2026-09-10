@@ -84,54 +84,71 @@ be dropped straight into AIO's own directory. Instead:
    old one across a script-file replace) — check the widget still shows
    the right content, and reconfigure via `ACTION_CONFIGURE` if not.
 
-## Panels — fully agent-programmable content
+## Panels — one unified surface for content and interactivity
 
 `obsidian-panel-1/2/3/4.lua` have no native widget binding at all — they
-render whatever the agent last pushed via `am broadcast`, in one of three
-modes selected by the first line of the pushed command:
+render whatever the agent last pushed via `am broadcast`, and dispatch
+taps through one small, general action vocabulary. This is the actual
+answer to "a clean, unified, powerful surface the agent can drive
+end-to-end" — one JSON envelope, three content modes, three action
+verbs, covering display, file editing, arbitrary effects, and anything
+needing real judgment, all with the same shape:
 
-- **text** (default) — title + body lines, HTML tags allowed, optional
-  leading `@<vault-relative-path>` line to make the whole panel tappable
-  (opens that note in the real editor — reuses `EditNoteActivity` via
-  `ObsidianWidgetProvider`'s `ACTION_EDIT`, extended with an optional
-  `note_path` extra since a panel has no bound widget instance to key
-  off).
-- **chart** (`chart:<json>`) — a real line chart via AIO's own
-  `ui:show_chart()`: `{"points":[[timestamp_ms,value],...],
-  "format":"x:date y:number","title":"...","show_grid":true}`.
-- **layout** (`layout:<json>`) — AIO's full declarative rich-UI element
-  language (`README_RICH_UI.md` in `~/aiolauncher_scripts`): text,
-  buttons, icons (including FontAwesome and custom SVGs), progress bars —
-  sized, colored, precisely positioned. `{"elements":[[...],[...]],
-  "actions":{"<element index>":"@<path>"}}` — `elements` passes straight
-  into `gui{}` (a JSON array of tuples decodes to exactly the Lua table
-  shape `gui{}` expects, no translation needed), `actions` maps a
-  1-based element index to a note path to open on tap. **Always include
-  the options table, even empty** — `["text","...",{}]`, never
+```
+am broadcast -a ru.execbit.aiolauncher.COMMAND \
+  --es cmd "script:obsidian-panel-2.lua:<json>"
+```
+
+**Content** (`<json>`'s `mode`):
+
+- `{"mode":"text","title":"...","body":"line1\nline2","action":"<verb>:<arg>"}`
+- `{"mode":"chart","points":[[ts_ms,value],...],"format":"x:date y:number","title":"...","show_grid":true,"action":"<verb>:<arg>"}`
+  — a real line chart via AIO's own `ui:show_chart()`.
+- `{"mode":"layout","elements":[[...],[...]],"actions":{"<idx>":"<verb>:<arg>"}}`
+  — AIO's full declarative rich-UI element language (`README_RICH_UI.md`
+  in `~/aiolauncher_scripts`): text, buttons, icons (FontAwesome or custom
+  SVGs), progress bars — sized, colored, precisely positioned.
+  `elements` passes straight into `gui{}` (a JSON array of tuples decodes
+  to exactly the Lua table shape it expects). **Always include the
+  options table, even empty** — `["text","...",{}]`, never
   `["text","..."]` — confirmed on-device that omitting it throws a LuaJ
   coercion error from `gui{}`'s internals for a JSON-decoded tuple, even
   though the equivalent bare 2-item Lua table literal is valid and
-  demonstrated in AIO's own docs.
+  demonstrated in AIO's own docs. `actions` maps a 1-based element index
+  (matching `gui{}`'s own click numbering) to an action string.
+- `{"mode":"clear"}` — resets to the placeholder state.
 
-`"clear"` resets a panel to its placeholder text state. See the script's
-own header comment for exact command examples and escaping notes (a real
-embedded newline in the `--es` value for text mode, not the two
-characters `\n`).
+**Actions** (`action`/`actions` values, `<verb>:<arg>`, identical
+regardless of mode or tap target):
 
-This is the actual answer to "one universal, hot-swappable widget whose
-content is fully programmable": the agent already reads the vault
-directly with its own tools, so it can compute *anything* — a note's
-content, a summary across several notes, a chart of some tracked metric,
-a whole custom layout with buttons and icons — and push the result here.
-It is not a live web renderer: RemoteViews-style Android widgets and
+- `open:<vault-relative-path>` — opens that note in the real editor
+  (reuses `EditNoteActivity` via `ObsidianWidgetProvider`'s
+  `ACTION_EDIT`, extended with an optional `note_path` extra since a
+  panel has no bound widget instance to key off). The general "edit
+  arbitrary files" mechanism — reliable, doesn't touch the native-widget
+  bridge at all.
+- `broadcast:<json>` — sends an arbitrary Android broadcast:
+  `{"action":"...","component":"...","extras":{...}}` (`component`
+  optional). Covers "effects/call an API" generally — anything reachable
+  by an Android intent (toggle a setting, open an app, hit another app's
+  own broadcast interface, loop back into this app for a custom effect).
+- `agent:<free text>` — forwards the text as a fresh prompt to
+  `agent-host.mjs` via `AgentTriggerReceiver` (`app/src/main/java/com/
+  obsidianwidget/AgentTriggerReceiver.kt`) — the same daemon the chat
+  widget talks to. For anything needing real judgment rather than a fixed
+  effect. Fire-and-forget: the agent's own subsequent actions (editing a
+  file, pushing updated panel content) are the visible result, not a
+  reply shown anywhere — the receiving agent should act, not just
+  respond conversationally, since nobody's watching a chat transcript
+  for this kind of prompt (it arrives prefixed `[Home screen: <panel>]`).
+
+This is not a live web renderer: RemoteViews-style Android widgets and
 AIO's own script sandbox both exclude WebView, so literal React/Ant
 Design can't run inside a panel — `gui{}`'s element language is AIO's own
-equivalent expressive layer, not a DOM. Content slots (below) are still
-the better fit specifically for a checklist you want to tap individual
-items on, since only a widget bound to the real native provider has real
-per-row click targets tied to the actual note file; a panel's clickable
-surface is whatever `actions` you declare (or one linked note, in text
-mode).
+equivalent expressive layer, not a DOM. Content slots (below) are, in
+principle, the better fit for a checklist you want to tap individual
+items on — but see that section for why there's really only one that
+works reliably.
 
 ## Content slots — and why there's really only one
 

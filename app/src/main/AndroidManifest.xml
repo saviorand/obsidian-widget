@@ -154,6 +154,14 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".AgentTriggerReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.obsidianwidget.aio.ACTION_AGENT_SIGNAL" />
+            </intent-filter>
+        </receiver>
+
     </application>
 
 </manifest>
