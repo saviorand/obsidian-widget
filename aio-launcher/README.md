@@ -11,6 +11,8 @@ longer term, be added/removed/reordered by an agent driving AIO itself.
 - `obsidian-slot-2.lua` / `-3.lua` / `-4.lua` — byte-identical to
   `obsidian-note.lua` except their `-- name =` metadata, each an
   independent instance of the same provider. See "Content slots" below.
+- `obsidian-panel-1/2/3/4.lua` — no native widget binding; render whatever
+  text the agent pushes via `am broadcast`. See "Panels" below.
 - `obsidian-notes.lua` — wraps `NotesWidgetProvider` (notes browser).
 - `obsidian-agent.lua` — wraps `AgentWidgetProvider` (agent chat); tapping
   it opens `AgentChatActivity`.
@@ -68,6 +70,37 @@ be dropped straight into AIO's own directory. Instead:
    script can allocate a fresh widget ID (AIO doesn't always preserve the
    old one across a script-file replace) — check the widget still shows
    the right content, and reconfigure via `ACTION_CONFIGURE` if not.
+
+## Panels — fully agent-programmable content
+
+`obsidian-panel-1/2/3/4.lua` have no native widget binding at all — they
+just render whatever text the agent last pushed, via `am broadcast`:
+
+```
+am broadcast -a ru.execbit.aiolauncher.COMMAND \
+  --es cmd "script:panel 1:<title>
+<body line 1>
+<body line 2>..."
+```
+
+`"script:panel 1:clear"` resets it. A leading `@<vault-relative-path>`
+line makes the whole panel tappable, opening that note in the real editor
+(reuses `EditNoteActivity` via `ObsidianWidgetProvider`'s `ACTION_EDIT`,
+extended with an optional `note_path` extra for exactly this — a
+broadcaster with no bound widget instance couldn't otherwise say which
+note to open). See the script's own header comment for the exact escaping
+notes (use a real embedded newline in the `--es` value, not the two
+characters `\n`).
+
+This is the actual answer to "one universal, hot-swappable widget type":
+the agent already reads the vault directly with its own tools, so it can
+compute *anything* — a note's content, a summary across several notes, a
+checklist it formats itself, an agent-chat digest — and push the finished
+text here. Content slots (below) are still the better fit specifically
+for a checklist you want to tap individual items on, since only a widget
+bound to the real native provider has real per-row click targets; a panel
+has exactly one tap action for the whole thing (open the linked note, if
+any).
 
 ## Content slots
 

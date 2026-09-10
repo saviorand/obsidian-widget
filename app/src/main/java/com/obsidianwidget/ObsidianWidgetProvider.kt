@@ -100,9 +100,17 @@ class ObsidianWidgetProvider : AppWidgetProvider() {
             ACTION_REFRESH -> updateAllWidgets(context)
             ACTION_EDIT -> {
                 val widgetId = intent.getIntExtra(EXTRA_WIDGET_ID, -1)
+                val notePath = intent.getStringExtra("note_path")
                 val editIntent = Intent(context, EditNoteActivity::class.java).apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                    putExtra(EXTRA_WIDGET_ID, widgetId)
+                    if (!notePath.isNullOrEmpty()) {
+                        // Lets a broadcaster with no bound widget instance (e.g. a
+                        // freeform content panel) open an arbitrary vault note by
+                        // path, the same way the notes-browser widget does.
+                        putExtra(EditNoteActivity.EXTRA_NOTE_PATH, notePath)
+                    } else {
+                        putExtra(EXTRA_WIDGET_ID, widgetId)
+                    }
                 }
                 context.startActivity(editIntent)
             }
