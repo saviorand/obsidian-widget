@@ -19,9 +19,11 @@ routing works before chasing why a specific name doesn't match.
 - `obsidian-note.lua` — wraps `ObsidianWidgetProvider` (checklist / plain-text
   note). Tapping a checklist row toggles it; tapping the title opens the
   full editor.
-- `obsidian-slot-2.lua` / `-3.lua` / `-4.lua` — byte-identical to
-  `obsidian-note.lua` except their `-- name =` metadata, each an
-  independent instance of the same provider. See "Content slots" below.
+- `obsidian-slot-2.lua` / `-3.lua` / `-4.lua` — same idea as
+  `obsidian-note.lua`, each bound to its own provider
+  (`ObsidianWidgetProvider2`/`3`/`4`). Kept in the repo but don't expect
+  them to work — see "Content slots" below for why a second instance of
+  this kind of widget doesn't reliably update on screen.
 - `obsidian-panel-1/2/3/4.lua` — no native widget binding; render whatever
   text the agent pushes via `am broadcast`. See "Panels" below.
 - `obsidian-notes.lua` — wraps `NotesWidgetProvider` (notes browser).
@@ -126,46 +128,54 @@ per-row click targets tied to the actual note file; a panel's clickable
 surface is whatever `actions` you declare (or one linked note, in text
 mode).
 
-## Content slots
+## Content slots — and why there's really only one
 
-`obsidian-note.lua` already handles "present some vault content" fully
+`obsidian-note.lua` handles "present some vault content" fully
 generically — pinned note or daily note, checklist or plain text, whatever
-`ACTION_CONFIGURE` points it at. So rather than a distinct widget type per
-kind of data, `obsidian-slot-2/3/4.lua` are plain duplicates of it: more
-independent instances of the same flexible widget, so most of the screen
-doesn't need to be permanently allocated to specific content. Fold the
-ones you're not using (`obsidian-controller.lua`'s `fold` op) and have the
-agent point an unfolded one at whatever note is relevant right now
-(`ACTION_CONFIGURE`'s `pin_note_paths`), unfolding more as needed.
+`ACTION_CONFIGURE` points it at, with real per-row tap targets (checking
+an item off updates the actual note file). The obvious next step —
+`obsidian-slot-2/3/4.lua`, plain duplicates of it for more independent
+slots — does NOT work, despite two rounds of investigation that looked
+promising:
 
-This only applies to *content* — `obsidian-agent.lua` (a chat UI) and
-`obsidian-notes.lua` (a navigation index) aren't "data slots" in the same
-sense and stay as dedicated, single-instance widgets.
+1. **First attempt**: assumed it was a staleness/timing bug (AIO caching
+   an old `bridge:snapshot()`). Tried remove/re-add, longer delays,
+   explicit `ACTION_REFRESH`, fold-toggling. None of it helped.
+2. **Second attempt**: `ObsidianWidgetProvider2`/`3`/`4` (empty subclasses
+   in the app, own manifest receiver + widget_info XML each) so each slot
+   binds a genuinely separate Android component instead of sharing
+   `ObsidianWidgetProvider`. This looked like it should fix a
+   provider-keyed caching bug in AIO's bridge — but tested directly and
+   it made no difference either: a widget bound through `Provider2`,
+   freshly created, correctly configured (verified via `ACTION_DUMP_STATE`
+   every single time), still never rendered past its first unconfigured
+   state.
 
-Each slot is a separate file rather than one script cloned N times:
-AIO's native widget-cloning (`clonable` in `available_widgets()`) is
-documented for a few builtin widgets (My Apps, Contacts) but nothing in
-the API confirms it works for a custom script with independent
-`widgets:setup()` state per clone, or that `prefs` storage would stay
-scoped per clone rather than colliding. Separate files sidestep that
-uncertainty entirely — `prefs` is already known to be scoped per script
-file, so each slot's own widget id can never collide with another's.
+Conclusion: **only the first native widget ever bound through
+`widgets:setup()` in an AIO session reliably receives live update
+notifications; every subsequent one is frozen after its first render**,
+regardless of which script or provider component it uses. This looks like
+an AIO-side limitation in its script-widget bridge, not something fixable
+from this app's side. The `ObsidianWidgetProvider2/3/4` classes and
+`obsidian-slot-2/3/4.lua` are left in the repo (harmless, and the
+per-provider structure may matter for other reasons later) but don't
+expect a second one to actually update on screen.
 
-**Each slot also binds a separate provider component**
-(`ObsidianWidgetProvider2`/`3`/`4` in the app, empty subclasses of
-`ObsidianWidgetProvider` — see that class's doc comment). This isn't
-optional: confirmed on-device that AIO's Lua wrapper only reliably
-delivers live update notifications (`on_app_widget_updated`) to the
-*first* tile bound to a given provider. A second `widgets:setup()` call
-against the *same* provider from a different script gets a real,
-correctly-configured native widget (verified directly via
-`ACTION_DUMP_STATE` every time) that nonetheless never visually updates
-past its first, unconfigured render — no error, it just silently never
-refreshes, which took a long debugging session to pin down. Because of
-this, `ACTION_CONFIGURE`/`ACTION_REFRESH` for a given slot's widget must
-target the *matching* provider component, not always
-`.ObsidianWidgetProvider` — `obsidian-slot-2.lua` -> `.ObsidianWidgetProvider2`,
-etc. `ACTION_DUMP_STATE` merges all four regardless of which one you ask.
+**Use a panel instead** for any note beyond the one working slot — the
+agent reads the file directly and pushes rendered content, which never
+touches `widgets:setup()`/`bridge:snapshot()` at all, so this limitation
+doesn't apply. The tradeoff is real but narrow: a panel has one whole-tile
+tap action (open the linked note), not per-row toggles — a loss only for
+content that's actually checklist-shaped; for prose it's not a
+compromise at all.
+
+If a second *genuinely interactive* checklist is ever required, the only
+path likely to work is a real native Android widget added through AIO's
+own regular "add widget" menu (bypassing AIO's Lua layer entirely, so
+whatever this bridge limitation is doesn't apply) — at the cost of the
+agent being unable to fold/reposition it via the controller, since it
+isn't an AIO script. A deliberate, narrow tradeoff to make knowingly, not
+a default.
 
 Adding a 5th+ slot later is the same recipe: copy `obsidian-note.lua`,
 change the `-- name =` line, import it.
