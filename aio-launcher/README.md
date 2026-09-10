@@ -8,6 +8,9 @@ longer term, be added/removed/reordered by an agent driving AIO itself.
 - `obsidian-note.lua` — wraps `ObsidianWidgetProvider` (checklist / plain-text
   note). Tapping a checklist row toggles it; tapping the title opens the
   full editor.
+- `obsidian-slot-2.lua` / `-3.lua` / `-4.lua` — byte-identical to
+  `obsidian-note.lua` except their `-- name =` metadata, each an
+  independent instance of the same provider. See "Content slots" below.
 - `obsidian-notes.lua` — wraps `NotesWidgetProvider` (notes browser).
 - `obsidian-agent.lua` — wraps `AgentWidgetProvider` (agent chat); tapping
   it opens `AgentChatActivity`.
@@ -65,6 +68,34 @@ be dropped straight into AIO's own directory. Instead:
    script can allocate a fresh widget ID (AIO doesn't always preserve the
    old one across a script-file replace) — check the widget still shows
    the right content, and reconfigure via `ACTION_CONFIGURE` if not.
+
+## Content slots
+
+`obsidian-note.lua` already handles "present some vault content" fully
+generically — pinned note or daily note, checklist or plain text, whatever
+`ACTION_CONFIGURE` points it at. So rather than a distinct widget type per
+kind of data, `obsidian-slot-2/3/4.lua` are plain duplicates of it: more
+independent instances of the same flexible widget, so most of the screen
+doesn't need to be permanently allocated to specific content. Fold the
+ones you're not using (`obsidian-controller.lua`'s `fold` op) and have the
+agent point an unfolded one at whatever note is relevant right now
+(`ACTION_CONFIGURE`'s `pin_note_paths`), unfolding more as needed.
+
+This only applies to *content* — `obsidian-agent.lua` (a chat UI) and
+`obsidian-notes.lua` (a navigation index) aren't "data slots" in the same
+sense and stay as dedicated, single-instance widgets.
+
+Each slot is a separate file rather than one script cloned N times:
+AIO's native widget-cloning (`clonable` in `available_widgets()`) is
+documented for a few builtin widgets (My Apps, Contacts) but nothing in
+the API confirms it works for a custom script with independent
+`widgets:setup()` state per clone, or that `prefs` storage would stay
+scoped per clone rather than colliding. Separate files sidestep that
+uncertainty entirely — `prefs` is already known to be scoped per script
+file, so each slot's own widget id can never collide with another's.
+
+Adding a 5th+ slot later is the same recipe: copy `obsidian-note.lua`,
+change the `-- name =` line, import it.
 
 ## Known v1 gaps
 
