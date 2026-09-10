@@ -33,4 +33,5 @@
     <string name="agent_widget_placeholder">Tap to ask…</string>
     <string name="send">Send</string>
     <string name="stop">Stop</string>
+    <string name="notes_widget_description">Browse and create notes in your vault</string>
 </resources>

@@ -61,6 +61,7 @@ class AgentChatActivity : AppCompatActivity() {
 
         findViewById<View>(R.id.chat_close).setOnClickListener { finish() }
         findViewById<View>(R.id.chat_settings).setOnClickListener { showSettingsDialog() }
+        findViewById<View>(R.id.chat_history).setOnClickListener { showSessionHistoryDialog() }
 
         sendButton.setOnClickListener {
             if (pendingTurn) {
@@ -157,6 +158,35 @@ class AgentChatActivity : AppCompatActivity() {
             .show()
     }
 
+    private fun showSessionHistoryDialog() {
+        val sessions = agentManager.sessionHistory
+        val labels = mutableListOf("+ New conversation")
+        labels += sessions.map { entry ->
+            val relative = android.text.format.DateUtils.getRelativeTimeSpanString(
+                entry.timestamp, System.currentTimeMillis(), android.text.format.DateUtils.MINUTE_IN_MILLIS
+            )
+            val current = if (entry.id == agentManager.sessionId) " (current)" else ""
+            "${entry.preview}$current — $relative"
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Sessions")
+            .setItems(labels.toTypedArray()) { _, which ->
+                if (which == 0) {
+                    agentManager.sessionId = null
+                    messagesContainer.removeAllViews()
+                    addSystemBubble("New conversation")
+                } else {
+                    val entry = sessions[which - 1]
+                    agentManager.sessionId = entry.id
+                    messagesContainer.removeAllViews()
+                    addSystemBubble("Resumed: ${entry.preview}")
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
     // ── sending ──────────────────────────────────────────────────────────
 
     private fun sendPrompt(text: String) {
@@ -237,6 +267,9 @@ class AgentChatActivity : AppCompatActivity() {
             agentManager.lastPreview = assistantTextThisTurn.toString().take(140)
             AgentWidgetProvider.updateAllWidgets(this)
         }
+        // MiMo has no session concept, so there's nothing to record there —
+        // only Claude turns leave a resumable id.
+        agentManager.sessionId?.let { agentManager.recordSession(it, lastUserText.take(60)) }
     }
 
     private fun updateSendButton() {
@@ -333,13 +366,21 @@ class AgentChatActivity : AppCompatActivity() {
                 scrollToBottom()
             }
             is AgentEvent.ToolUse -> {
-                val summary = summarizeToolInput(event.input)
-                val bubble = addSystemBubble("🔧 ${event.name}${if (summary.isNotEmpty()) ": $summary" else ""}")
+                val argLines = toolArgLines(event.input)
+                val header = "🔧 ${event.name}"
+                val body = if (argLines.isEmpty()) header else
+                    header + "\n" + argLines.joinToString("\n") { "  $it" }
+                val bubble = addSystemBubble(body)
                 pendingToolBubbles[event.id] = bubble
             }
             is AgentEvent.ToolResult -> {
                 val bubble = pendingToolBubbles.remove(event.id) ?: return
-                val outcome = if (event.isError) "⚠ ${event.content.take(200)}" else "✓ done"
+                val preview = event.content.take(300).let { if (event.content.length > 300) "$it…" else it }
+                val outcome = when {
+                    event.isError -> "⚠ $preview"
+                    preview.isNotBlank() -> "→ $preview"
+                    else -> "✓ done"
+                }
                 bubble.text = "${bubble.text}\n$outcome"
             }
             is AgentEvent.Error -> {
@@ -350,12 +391,27 @@ class AgentChatActivity : AppCompatActivity() {
         }
     }
 
-    private fun summarizeToolInput(input: JSONObject): String {
-        for (key in listOf("path", "query", "folder")) {
-            val value = input.optString(key, "")
-            if (value.isNotEmpty()) return value
+    /**
+     * Every argument, not just a guessed "the" one — same fields the
+     * plugin's own tool-row renderer lists (ported from plugin/main.js's
+     * `U()`). Bash's field is `command`, Read/Edit/Write's is `file_path`,
+     * Grep's is `pattern` — the previous path/query/folder-only list showed
+     * nothing at all for a Bash call, which is the bug being fixed here.
+     */
+    private fun toolArgLines(input: JSONObject): List<String> {
+        val lines = mutableListOf<String>()
+        val keys = input.keys()
+        while (keys.hasNext()) {
+            val key = keys.next()
+            if (key == "content" || key == "new_string" || key == "old_string") {
+                lines.add("$key: ${input.optString(key, "").length} characters")
+                continue
+            }
+            val raw = input.opt(key)
+            val text = if (raw is String) raw else raw?.toString() ?: continue
+            lines.add("$key: ${if (text.length > 300) text.take(299) + "…" else text}")
         }
-        return ""
+        return lines
     }
 
     // ── transcript UI ────────────────────────────────────────────────────
@@ -363,10 +419,10 @@ class AgentChatActivity : AppCompatActivity() {
     private fun addBubble(text: String, isUser: Boolean, isThinking: Boolean = false): TextView {
         val view = TextView(this).apply {
             this.text = text
-            setTextColor(getColor(if (isUser) R.color.white else if (isThinking) R.color.obsidian_text_secondary else R.color.obsidian_text))
+            setTextColor(getColor(if (isUser) R.color.white else if (isThinking) R.color.chat_text_secondary_light else R.color.chat_text_light))
             textSize = if (isThinking) 12f else 14f
             setPadding(24, 16, 24, 16)
-            background = getDrawable(if (isUser) R.drawable.button_background else R.drawable.card_background)
+            background = getDrawable(if (isUser) R.drawable.button_background else R.drawable.card_background_light)
             typeface = when {
                 isUser -> Typeface.DEFAULT_BOLD
                 isThinking -> Typeface.create(Typeface.DEFAULT, Typeface.ITALIC)
@@ -391,7 +447,7 @@ class AgentChatActivity : AppCompatActivity() {
     private fun addSystemBubble(text: String): TextView {
         val view = TextView(this).apply {
             this.text = text
-            setTextColor(getColor(R.color.obsidian_text_secondary))
+            setTextColor(getColor(R.color.chat_text_secondary_light))
             textSize = 12f
             gravity = Gravity.CENTER
         }

@@ -6,9 +6,7 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.content.res.ColorStateList
 import android.net.Uri
-import android.os.Build
 import android.provider.DocumentsContract
 import android.view.View
 import android.widget.RemoteViews
@@ -17,15 +15,12 @@ class ObsidianWidgetProvider : AppWidgetProvider() {
 
     companion object {
         private const val ACTION_REFRESH = "com.obsidianwidget.ACTION_REFRESH"
-        private const val ACTION_CAPTURE = "com.obsidianwidget.ACTION_CAPTURE"
         private const val ACTION_EDIT = "com.obsidianwidget.ACTION_EDIT"
         private const val ACTION_OPEN = "com.obsidianwidget.ACTION_OPEN"
         private const val ACTION_TOGGLE = "com.obsidianwidget.ACTION_TOGGLE"
-        private const val ACTION_ADD = "com.obsidianwidget.ACTION_ADD"
         private const val ACTION_NAV_LEFT = "com.obsidianwidget.ACTION_NAV_LEFT"
         private const val ACTION_NAV_RIGHT = "com.obsidianwidget.ACTION_NAV_RIGHT"
         const val EXTRA_LINE_INDEX = "extra_line_index"
-        const val EXTRA_APPEND_TO_WIDGET = "extra_append_to_widget"
         const val EXTRA_WIDGET_ID = "extra_widget_id"
         const val EXTRA_URL = "extra_url"
 
@@ -63,23 +58,6 @@ class ObsidianWidgetProvider : AppWidgetProvider() {
 
         when (intent.action) {
             ACTION_REFRESH -> updateAllWidgets(context)
-            ACTION_CAPTURE -> {
-                val widgetId = intent.getIntExtra(EXTRA_WIDGET_ID, -1)
-                val captureIntent = Intent(context, QuickCaptureActivity::class.java).apply {
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                    putExtra(EXTRA_WIDGET_ID, widgetId)
-                }
-                context.startActivity(captureIntent)
-            }
-            ACTION_ADD -> {
-                val widgetId = intent.getIntExtra(EXTRA_WIDGET_ID, -1)
-                val addIntent = Intent(context, QuickCaptureActivity::class.java).apply {
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                    putExtra(EXTRA_APPEND_TO_WIDGET, true)
-                    putExtra(EXTRA_WIDGET_ID, widgetId)
-                }
-                context.startActivity(addIntent)
-            }
             ACTION_EDIT -> {
                 val widgetId = intent.getIntExtra(EXTRA_WIDGET_ID, -1)
                 val editIntent = Intent(context, EditNoteActivity::class.java).apply {
@@ -198,12 +176,6 @@ class ObsidianWidgetProvider : AppWidgetProvider() {
             views.setTextViewText(R.id.widget_note_preview, message)
         }
 
-        // Add to note button
-        views.setOnClickPendingIntent(
-            R.id.widget_add,
-            createActionIntent(context, ACTION_ADD, appWidgetId)
-        )
-
         // Title click always opens note in Obsidian
         views.setOnClickPendingIntent(
             R.id.widget_date,
@@ -240,22 +212,10 @@ class ObsidianWidgetProvider : AppWidgetProvider() {
             createActionIntent(context, ACTION_REFRESH, appWidgetId)
         )
 
-        // Quick capture button
-        views.setOnClickPendingIntent(
-            R.id.widget_btn_capture,
-            createActionIntent(context, ACTION_CAPTURE, appWidgetId)
-        )
-
         // Edit (pencil) button — full-note plain-text editor
         views.setOnClickPendingIntent(
             R.id.widget_edit,
             createActionIntent(context, ACTION_EDIT, appWidgetId)
-        )
-
-        // Show/hide button bar based on setting
-        views.setViewVisibility(
-            R.id.widget_button_bar,
-            if (vaultManager.showButtons) View.VISIBLE else View.GONE
         )
 
         // Absorb taps on empty space so they don't trigger launcher reconfigure
@@ -281,13 +241,6 @@ class ObsidianWidgetProvider : AppWidgetProvider() {
         views.setInt(R.id.widget_settings, "setColorFilter", colors.text)
         views.setInt(R.id.widget_cycle_note, "setColorFilter", colors.text)
         views.setInt(R.id.widget_edit, "setColorFilter", colors.text)
-
-        // Tint accent-colored buttons (preserves rounded drawable shape)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val accentTint = ColorStateList.valueOf(colors.accent)
-            views.setColorStateList(R.id.widget_btn_capture, "setBackgroundTintList", accentTint)
-            views.setColorStateList(R.id.widget_add, "setBackgroundTintList", accentTint)
-        }
 
         appWidgetManager.updateAppWidget(appWidgetId, views)
     }

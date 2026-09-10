@@ -2,6 +2,8 @@ package com.obsidianwidget
 
 import android.content.Context
 import android.content.SharedPreferences
+import org.json.JSONArray
+import org.json.JSONObject
 
 /**
  * Connection settings and last-turn state for the agent chat widget.
@@ -20,6 +22,8 @@ class AgentManager(context: Context) {
         private const val KEY_MIMO_KEY = "mimo_key"
         private const val KEY_MIMO_BASE_URL = "mimo_base_url"
         private const val KEY_MIMO_MODEL = "mimo_model"
+        private const val KEY_SESSION_HISTORY = "session_history"
+        private const val MAX_SESSION_HISTORY = 20
         const val DEFAULT_HOST = "127.0.0.1"
         const val DEFAULT_PORT = 8177
         // Same defaults as obsidian-agent's plugin, so a key copied from
@@ -62,4 +66,40 @@ class AgentManager(context: Context) {
 
     val wsUrl: String
         get() = "ws://$host:$port/"
+
+    data class SessionEntry(val id: String, val preview: String, val timestamp: Long)
+
+    /** Most-recently-used first. */
+    var sessionHistory: List<SessionEntry>
+        get() {
+            val raw = prefs.getString(KEY_SESSION_HISTORY, null) ?: return emptyList()
+            return try {
+                val arr = JSONArray(raw)
+                (0 until arr.length()).map {
+                    val o = arr.getJSONObject(it)
+                    SessionEntry(o.getString("id"), o.getString("preview"), o.getLong("timestamp"))
+                }
+            } catch (e: Exception) {
+                emptyList()
+            }
+        }
+        private set(value) {
+            val arr = JSONArray()
+            for (entry in value) {
+                arr.put(JSONObject().apply {
+                    put("id", entry.id)
+                    put("preview", entry.preview)
+                    put("timestamp", entry.timestamp)
+                })
+            }
+            prefs.edit().putString(KEY_SESSION_HISTORY, arr.toString()).apply()
+        }
+
+    /** Upserts by id, most-recent first, capped — called once per completed turn. */
+    fun recordSession(id: String, preview: String) {
+        if (id.isEmpty() || id == "null") return
+        val rest = sessionHistory.filterNot { it.id == id }
+        sessionHistory = (listOf(SessionEntry(id, preview, System.currentTimeMillis())) + rest)
+            .take(MAX_SESSION_HISTORY)
+    }
 }

@@ -14,7 +14,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Agent host"
-        android:textColor="@color/obsidian_text_secondary"
+        android:textColor="@color/chat_text_secondary_light"
         android:textSize="12sp"
         android:layout_marginBottom="4dp" />
 
@@ -22,10 +22,10 @@
         android:id="@+id/settings_host"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@drawable/input_background"
+        android:background="@drawable/input_background_light"
         android:inputType="textNoSuggestions"
         android:padding="12dp"
-        android:textColor="@color/obsidian_text"
+        android:textColor="@color/chat_text_light"
         android:textSize="14sp"
         android:layout_marginBottom="14dp" />
 
@@ -33,7 +33,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Port"
-        android:textColor="@color/obsidian_text_secondary"
+        android:textColor="@color/chat_text_secondary_light"
         android:textSize="12sp"
         android:layout_marginBottom="4dp" />
 
@@ -41,10 +41,10 @@
         android:id="@+id/settings_port"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@drawable/input_background"
+        android:background="@drawable/input_background_light"
         android:inputType="number"
         android:padding="12dp"
-        android:textColor="@color/obsidian_text"
+        android:textColor="@color/chat_text_light"
         android:textSize="14sp"
         android:layout_marginBottom="18dp" />
 
@@ -52,7 +52,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Fallback (MiMo)"
-        android:textColor="@color/obsidian_text"
+        android:textColor="@color/chat_text_light"
         android:textSize="14sp"
         android:fontFamily="sans-serif-medium"
         android:layout_marginBottom="2dp" />
@@ -61,7 +61,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Used when the agent host isn't reachable. Billed per token, and its tools can only read and write notes — not Claude Code's full tool set."
-        android:textColor="@color/obsidian_text_secondary"
+        android:textColor="@color/chat_text_secondary_light"
         android:textSize="11sp"
         android:layout_marginBottom="10dp" />
 
@@ -69,7 +69,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="MiMo API key"
-        android:textColor="@color/obsidian_text_secondary"
+        android:textColor="@color/chat_text_secondary_light"
         android:textSize="12sp"
         android:layout_marginBottom="4dp" />
 
@@ -77,12 +77,12 @@
         android:id="@+id/settings_mimo_key"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@drawable/input_background"
+        android:background="@drawable/input_background_light"
         android:inputType="textPassword"
         android:hint="empty means no fallback"
         android:padding="12dp"
-        android:textColor="@color/obsidian_text"
-        android:textColorHint="@color/obsidian_text_secondary"
+        android:textColor="@color/chat_text_light"
+        android:textColorHint="@color/chat_text_secondary_light"
         android:textSize="14sp"
         android:layout_marginBottom="14dp" />
 
@@ -90,7 +90,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="MiMo endpoint"
-        android:textColor="@color/obsidian_text_secondary"
+        android:textColor="@color/chat_text_secondary_light"
         android:textSize="12sp"
         android:layout_marginBottom="4dp" />
 
@@ -98,10 +98,10 @@
         android:id="@+id/settings_mimo_url"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@drawable/input_background"
+        android:background="@drawable/input_background_light"
         android:inputType="textUri"
         android:padding="12dp"
-        android:textColor="@color/obsidian_text"
+        android:textColor="@color/chat_text_light"
         android:textSize="14sp"
         android:layout_marginBottom="14dp" />
 
@@ -109,7 +109,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="MiMo model"
-        android:textColor="@color/obsidian_text_secondary"
+        android:textColor="@color/chat_text_secondary_light"
         android:textSize="12sp"
         android:layout_marginBottom="4dp" />
 
@@ -117,10 +117,10 @@
         android:id="@+id/settings_mimo_model"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@drawable/input_background"
+        android:background="@drawable/input_background_light"
         android:inputType="textNoSuggestions"
         android:padding="12dp"
-        android:textColor="@color/obsidian_text"
+        android:textColor="@color/chat_text_light"
         android:textSize="14sp" />
 </LinearLayout>
 </ScrollView>

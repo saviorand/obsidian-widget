@@ -2,7 +2,7 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="@drawable/dialog_background"
+    android:background="@drawable/dialog_background_light"
     android:orientation="vertical"
     android:padding="14dp"
     android:minWidth="320dp">
@@ -25,7 +25,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Agent"
-                android:textColor="@color/obsidian_text"
+                android:textColor="@color/chat_text_light"
                 android:textSize="18sp"
                 android:fontFamily="sans-serif-medium" />
 
@@ -34,9 +34,20 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text=""
-                android:textColor="@color/obsidian_text_secondary"
+                android:textColor="@color/chat_text_secondary_light"
                 android:textSize="10sp" />
         </LinearLayout>
+
+        <ImageButton
+            android:id="@+id/chat_history"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_marginEnd="4dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Session history"
+            android:src="@android:drawable/ic_menu_recent_history"
+            android:tint="@color/chat_text_light"
+            android:scaleType="centerInside" />
 
         <ImageButton
             android:id="@+id/chat_settings"
@@ -46,6 +57,7 @@
             android:background="?android:attr/selectableItemBackgroundBorderless"
             android:contentDescription="Connection settings"
             android:src="@android:drawable/ic_menu_manage"
+            android:tint="@color/chat_text_light"
             android:scaleType="centerInside" />
 
         <ImageButton
@@ -55,6 +67,7 @@
             android:background="?android:attr/selectableItemBackgroundBorderless"
             android:contentDescription="Close"
             android:src="@android:drawable/ic_menu_close_clear_cancel"
+            android:tint="@color/chat_text_light"
             android:scaleType="centerInside" />
     </LinearLayout>
 
@@ -63,7 +76,7 @@
         android:layout_width="match_parent"
         android:layout_height="380dp"
         android:layout_marginBottom="10dp"
-        android:background="@drawable/input_background">
+        android:background="@drawable/input_background_light">
 
         <LinearLayout
             android:id="@+id/chat_messages"
@@ -85,14 +98,14 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_marginEnd="8dp"
-            android:background="@drawable/input_background"
+            android:background="@drawable/input_background_light"
             android:gravity="top|start"
             android:hint="Ask the agent…"
             android:inputType="textMultiLine|textCapSentences"
             android:maxLines="5"
             android:padding="12dp"
-            android:textColor="@color/obsidian_text"
-            android:textColorHint="@color/obsidian_text_secondary"
+            android:textColor="@color/chat_text_light"
+            android:textColorHint="@color/chat_text_secondary_light"
             android:textSize="14sp" />
 
         <Button

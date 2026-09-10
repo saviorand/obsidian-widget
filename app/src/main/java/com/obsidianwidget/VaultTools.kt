@@ -88,12 +88,31 @@ class VaultTools(private val context: Context, private val vaultUri: Uri) {
         for (child in dir.listFiles()) {
             val name = child.name ?: continue
             if (child.isDirectory) {
-                if (name == ".obsidian" || name == ".git") continue
+                // Any dot-directory, not just .obsidian/.git — .claude alone
+                // was a quarter of one real vault's directory count, all SAF
+                // round-trips wasted on non-notes (and .claude's own files
+                // would otherwise show up in the notes list as if they were
+                // vault content).
+                if (name.startsWith(".")) continue
                 walk(child, if (prefix.isEmpty()) name else "$prefix/$name", out)
             } else {
                 out.add((if (prefix.isEmpty()) name else "$prefix/$name") to child)
             }
         }
+    }
+
+    data class NoteEntry(val path: String, val lastModified: Long)
+
+    /** All .md notes, most recently modified first — what the notes-browser widget lists. */
+    fun listAllNotesSorted(limit: Int = 200): List<NoteEntry> {
+        val root = root() ?: return emptyList()
+        val all = mutableListOf<Pair<String, DocumentFile>>()
+        walk(root, "", all)
+        return all
+            .filter { it.first.endsWith(".md") }
+            .map { NoteEntry(it.first, it.second.lastModified()) }
+            .sortedByDescending { it.lastModified }
+            .take(limit)
     }
 
     fun listNotes(folder: String?): String {

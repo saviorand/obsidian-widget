@@ -19,4 +19,14 @@
         <item name="android:backgroundDimEnabled">true</item>
         <item name="android:backgroundDimAmount">0.90</item>
     </style>
+
+    <!-- Agent chat only. -->
+    <style name="Theme.ObsidianWidget.Dialog.Light" parent="Theme.Material3.Light.Dialog">
+        <item name="colorPrimary">@color/obsidian_primary</item>
+        <item name="colorAccent">@color/obsidian_accent</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowIsFloating">true</item>
+        <item name="android:backgroundDimEnabled">true</item>
+        <item name="android:backgroundDimAmount">0.60</item>
+    </style>
 </resources>
