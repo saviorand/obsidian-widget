@@ -20,6 +20,46 @@ class ObsidianWidgetProvider : AppWidgetProvider() {
         private const val ACTION_TOGGLE = "com.obsidianwidget.ACTION_TOGGLE"
         private const val ACTION_NAV_LEFT = "com.obsidianwidget.ACTION_NAV_LEFT"
         private const val ACTION_NAV_RIGHT = "com.obsidianwidget.ACTION_NAV_RIGHT"
+
+        /**
+         * Everything WidgetConfigActivity's Save button can do, reachable
+         * without tapping through the UI:
+         *
+         *   am broadcast -n com.obsidianwidget/.ObsidianWidgetProvider \
+         *     -a com.obsidianwidget.ACTION_CONFIGURE --ei extra_widget_id <id> \
+         *     [--es note_mode daily|pinned] [--es daily_folder <path>] \
+         *     [--es date_format <pattern>] \
+         *     [--es pin_note_paths "<vault-relative path>[,<path>...]"] \
+         *     [--es theme dark|light] [--es accent_color "#RRGGBB"] \
+         *     [--ez sort_unchecked true|false] [--ez tap_checkbox_only true|false] \
+         *     [--ez show_todo_count true|false] [--ei widget_alpha 0-100]
+         *
+         * Every extra is optional and applied only if present (a partial
+         * update, not a full replace) — omit whatever you're not changing.
+         * pin_note_paths resolves each path within the already-granted vault
+         * tree (VaultTools.findFile) and replaces the pinned list outright;
+         * it implies pinned mode unless note_mode says otherwise. A widget
+         * id with no vault configured yet is a no-op — that one step (the
+         * first-ever folder grant) needs a human tap in the system picker,
+         * same as any Android app's SAF access; everything past it doesn't.
+         */
+        private const val ACTION_CONFIGURE = "com.obsidianwidget.ACTION_CONFIGURE"
+
+        /**
+         * ACTION_CONFIGURE needs a widget id, and there's no way to list
+         * placed widget ids from Termux — dumpsys appwidget needs
+         * android.permission.DUMP, which a regular (non-shell) app doesn't
+         * have. This writes each instance's id and current settings to
+         * <vault>/.obsidian-widget-state.json instead, which Termux can
+         * just read directly — no special permission needed, it's the same
+         * shared-storage access every other tool/skill in this vault uses.
+         *
+         *   am broadcast -n com.obsidianwidget/.ObsidianWidgetProvider \
+         *     -a com.obsidianwidget.ACTION_DUMP_STATE
+         */
+        private const val ACTION_DUMP_STATE = "com.obsidianwidget.ACTION_DUMP_STATE"
+        private const val STATE_FILE_NAME = ".obsidian-widget-state.json"
+
         const val EXTRA_LINE_INDEX = "extra_line_index"
         const val EXTRA_WIDGET_ID = "extra_widget_id"
         const val EXTRA_URL = "extra_url"
@@ -99,7 +139,84 @@ class ObsidianWidgetProvider : AppWidgetProvider() {
                     updateWidget(context, appWidgetManager, widgetId)
                 }
             }
+            ACTION_CONFIGURE -> {
+                val widgetId = intent.getIntExtra(EXTRA_WIDGET_ID, -1)
+                if (widgetId >= 0) {
+                    applyConfigure(context, widgetId, intent)
+                    updateWidget(context, AppWidgetManager.getInstance(context), widgetId)
+                }
+            }
+            ACTION_DUMP_STATE -> dumpState(context)
         }
+    }
+
+    private fun dumpState(context: Context) {
+        val vaultUri = VaultManager(context).vaultUri ?: return
+        val appWidgetManager = AppWidgetManager.getInstance(context)
+        val ids = appWidgetManager.getAppWidgetIds(ComponentName(context, ObsidianWidgetProvider::class.java))
+
+        val arr = org.json.JSONArray()
+        for (id in ids) {
+            val vm = VaultManager(context, id)
+            arr.put(org.json.JSONObject().apply {
+                put("widget_id", id)
+                put("note_mode", if (vm.noteMode == VaultManager.NoteMode.PINNED) "pinned" else "daily")
+                put("daily_folder", vm.dailyFolder)
+                put("date_format", vm.dateFormat)
+                put("pinned_notes", org.json.JSONArray(vm.pinnedNoteNameList))
+                put("current_note_index", vm.currentNoteIndex)
+                put("theme", vm.widgetTheme)
+                put("accent_color", vm.accentColor)
+                put("sort_unchecked", vm.sortUnchecked)
+                put("tap_checkbox_only", vm.tapCheckboxOnly)
+                put("show_todo_count", vm.showTodoCount)
+            })
+        }
+
+        val root = androidx.documentfile.provider.DocumentFile.fromTreeUri(context, vaultUri) ?: return
+        val file = root.findFile(STATE_FILE_NAME) ?: root.createFile("application/json", STATE_FILE_NAME) ?: return
+        try {
+            context.contentResolver.openOutputStream(file.uri, "wt")?.use { os ->
+                java.io.OutputStreamWriter(os).use { it.write(arr.toString(2)) }
+            }
+        } catch (e: Exception) {
+            // Best-effort — a failed dump just means the agent tries again.
+        }
+    }
+
+    private fun applyConfigure(context: Context, widgetId: Int, intent: Intent) {
+        val vaultManager = VaultManager(context, widgetId)
+
+        intent.getStringExtra("pin_note_paths")?.let { raw ->
+            val vaultUri = vaultManager.vaultUri
+            if (vaultUri != null) {
+                val tools = VaultTools(context, vaultUri)
+                val uris = mutableListOf<String>()
+                val names = mutableListOf<String>()
+                for (path in raw.split(",", "\n").map { it.trim() }.filter { it.isNotEmpty() }) {
+                    val file = tools.findFile(path) ?: continue
+                    uris.add(file.uri.toString())
+                    names.add(path.substringAfterLast('/'))
+                }
+                vaultManager.pinnedNoteUriList = uris
+                vaultManager.pinnedNoteNameList = names
+                vaultManager.currentNoteIndex = 0
+                if (uris.isNotEmpty() && !intent.hasExtra("note_mode")) {
+                    vaultManager.noteMode = VaultManager.NoteMode.PINNED
+                }
+            }
+        }
+        intent.getStringExtra("note_mode")?.let {
+            vaultManager.noteMode = if (it == "pinned") VaultManager.NoteMode.PINNED else VaultManager.NoteMode.DAILY
+        }
+        intent.getStringExtra("daily_folder")?.let { vaultManager.dailyFolder = it }
+        intent.getStringExtra("date_format")?.let { vaultManager.dateFormat = it }
+        intent.getStringExtra("theme")?.let { vaultManager.widgetTheme = if (it == "light") "light" else "dark" }
+        intent.getStringExtra("accent_color")?.let { vaultManager.accentColor = it }
+        if (intent.hasExtra("sort_unchecked")) vaultManager.sortUnchecked = intent.getBooleanExtra("sort_unchecked", false)
+        if (intent.hasExtra("tap_checkbox_only")) vaultManager.tapCheckboxOnly = intent.getBooleanExtra("tap_checkbox_only", false)
+        if (intent.hasExtra("show_todo_count")) vaultManager.showTodoCount = intent.getBooleanExtra("show_todo_count", false)
+        if (intent.hasExtra("widget_alpha")) vaultManager.widgetAlpha = intent.getIntExtra("widget_alpha", 100)
     }
 
     private fun updateWidget(

@@ -3,7 +3,7 @@
     android:id="@+id/agent_widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/widget_background"
+    android:background="@drawable/widget_background_light"
     android:orientation="vertical"
     android:padding="16dp"
     android:gravity="center_vertical">
@@ -13,7 +13,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Agent"
-        android:textColor="@color/obsidian_text"
+        android:textColor="@color/chat_text_light"
         android:textSize="15sp"
         android:fontFamily="sans-serif-medium" />
 
@@ -23,7 +23,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
         android:text="@string/agent_widget_placeholder"
-        android:textColor="@color/obsidian_text_secondary"
+        android:textColor="@color/chat_text_secondary_light"
         android:textSize="13sp"
         android:maxLines="2"
         android:ellipsize="end" />

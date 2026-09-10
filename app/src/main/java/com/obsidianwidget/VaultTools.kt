@@ -44,6 +44,16 @@ class VaultTools(private val context: Context, private val vaultUri: Uri) {
         return resolveDir(parentPath, createDirs = false)?.findFile(leaf)
     }
 
+    /**
+     * Public resolution by vault-relative path, for callers that need the
+     * DocumentFile itself (its Uri) rather than its contents — e.g. pinning
+     * a note by path needs a Uri to store, the same shape VaultManager
+     * already persists for a note picked through the system file picker.
+     * No new SAF grant involved: this only navigates within the
+     * already-permitted vault tree.
+     */
+    fun findFile(path: String): DocumentFile? = resolveFile(path)
+
     fun readNote(path: String): String {
         val file = resolveFile(path) ?: return "no note at $path"
         return try {
