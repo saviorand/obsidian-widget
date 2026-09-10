@@ -106,7 +106,12 @@ modes selected by the first line of the pushed command:
   "actions":{"<element index>":"@<path>"}}` — `elements` passes straight
   into `gui{}` (a JSON array of tuples decodes to exactly the Lua table
   shape `gui{}` expects, no translation needed), `actions` maps a
-  1-based element index to a note path to open on tap.
+  1-based element index to a note path to open on tap. **Always include
+  the options table, even empty** — `["text","...",{}]`, never
+  `["text","..."]` — confirmed on-device that omitting it throws a LuaJ
+  coercion error from `gui{}`'s internals for a JSON-decoded tuple, even
+  though the equivalent bare 2-item Lua table literal is valid and
+  demonstrated in AIO's own docs.
 
 `"clear"` resets a panel to its placeholder text state. See the script's
 own header comment for exact command examples and escaping notes (a real

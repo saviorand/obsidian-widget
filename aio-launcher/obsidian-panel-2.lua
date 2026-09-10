@@ -41,7 +41,13 @@
 -- equivalent expressive layer instead). JSON array of element tuples,
 -- passed through to `gui{}` almost verbatim -- each JSON array becomes a
 -- Lua table, so a spec written to match the gui{} examples in
--- README_RICH_UI.md works with no translation:
+-- README_RICH_UI.md works with no translation, with ONE gotcha confirmed
+-- on-device: every element tuple MUST include its options table
+-- explicitly, even if empty ([..., {}]) -- omitting it (a bare
+-- ["text","..."] with no third item, valid in a native Lua literal per
+-- README_RICH_UI.md's own first example) throws a LuaJ argument-coercion
+-- error from gui{}'s internals when the tuple comes from json.decode
+-- instead of a Lua table constructor.
 --   am broadcast -a ru.execbit.aiolauncher.COMMAND \
 --     --es cmd 'script:obsidian-panel-2.lua:layout:{"elements":[["text","<b>Tasks</b>",{"size":20}],["new_line",2],["progress","Today",{"progress":70}],["new_line",2],["button","Open Todo",{"color":"#00aa00"}]],"actions":{"3":"@Todo.md"}}'
 --   "actions" maps a 1-based element index (matching on_click's argument)
