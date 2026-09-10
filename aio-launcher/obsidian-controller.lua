@@ -3,6 +3,7 @@
 -- type = "widget"
 -- version = "1.0"
 -- aio_version = "7.5.0-beta2"
+-- on_resume_when_folding = "true"
 
 -- One-time setup this script can't do for itself:
 --   AIO Settings -> Tasker -> Remote API -> enable it, note the password.
@@ -52,6 +53,19 @@ local REPORT_ACTION = "com.obsidianwidget.aio.ACTION_REPORT"
 local REPORT_RECEIVER = "com.obsidianwidget/com.obsidianwidget.AioBridgeReceiver"
 
 local last_status = "Controller ready"
+
+-- AIO's automatic fold behavior (showing just the "first line") applies to
+-- ui:show_lines()-style content, not a plain ui:show_text() call -- folding
+-- this widget alone left its last status fully visible. on_resume_when_folding
+-- (metadata above) makes on_resume fire on every fold/unfold, so this can
+-- explicitly render nothing while folded instead.
+local function render()
+    if ui:is_folded() then
+        ui:show_text("")
+    else
+        ui:show_text(last_status)
+    end
+end
 
 local function json_escape(s)
     return tostring(s):gsub('[\\"]', '\\%0'):gsub('\n', '\\n')
@@ -123,7 +137,7 @@ function on_command(cmd)
 
     last_status = ok and (tostring(op) .. " " .. tostring(name) .. " ok")
         or ("FAILED: " .. tostring(err))
-    ui:show_text(last_status)
+    render()
     report()
 end
 
@@ -131,7 +145,7 @@ end
 -- add/remove/move on the real home screen), not just via on_command.
 function on_widget_action(action, name)
     last_status = tostring(action) .. " " .. tostring(name) .. " (manual)"
-    ui:show_text(last_status)
+    render()
     report()
 end
 
@@ -139,11 +153,11 @@ end
 -- actually calls a ui:show_* function -- report() alone (just a broadcast,
 -- no UI call) never did, which was the "stuck on loading" bug.
 function on_load()
-    ui:show_text(last_status)
+    render()
     report()
 end
 function on_resume()
-    ui:show_text(last_status)
+    render()
     report()
 end
-function on_click() ui:show_text(last_status) end
+function on_click() render() end

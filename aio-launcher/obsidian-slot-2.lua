@@ -12,9 +12,16 @@
 -- can already reconfigure a note widget via ACTION_CONFIGURE broadcasts,
 -- which covers most of what Settings would do here anyway.
 
+-- Bound to ObsidianWidgetProvider2, NOT the same component as
+-- obsidian-note.lua/other slots -- confirmed on-device that AIO's
+-- Lua wrapper only reliably live-updates the FIRST tile bound to a
+-- given provider; separate slots need separate provider components.
+-- ACTION_CONFIGURE/ACTION_REFRESH for THIS widget must target
+-- com.obsidianwidget/.ObsidianWidgetProvider2, not the plain one.
+
 local prefs = require "prefs"
 
-local PROVIDER = "com.obsidianwidget/com.obsidianwidget.ObsidianWidgetProvider"
+local PROVIDER = "com.obsidianwidget/com.obsidianwidget.ObsidianWidgetProvider2"
 local current_bridge = nil
 local edit_target = nil
 local row_targets = {}
@@ -45,7 +52,7 @@ local function refresh()
     -- pick up the post-refresh content once it's actually landed.
     intent:send_broadcast{
         action = "com.obsidianwidget.ACTION_REFRESH",
-        component = "com.obsidianwidget/com.obsidianwidget.ObsidianWidgetProvider",
+        component = "com.obsidianwidget/com.obsidianwidget.ObsidianWidgetProvider2",
     }
     widgets:request_updates(prefs.note_widget_id)
     pending_refresh_ticks = 2

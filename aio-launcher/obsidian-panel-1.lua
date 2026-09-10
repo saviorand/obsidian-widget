@@ -1,9 +1,10 @@
 -- name = "Panel 1"
 -- description = "Fully agent-programmable content panel -- text, charts, or a full declarative layout"
 -- type = "widget"
--- version = "2.0"
+-- version = "2.1"
 -- aio_version = "7.5.0-beta2"
 -- uses_app = "com.obsidianwidget"
+-- on_resume_when_folding = "true"
 
 -- No native widget binding at all -- unlike obsidian-note.lua, this panel
 -- doesn't read any specific vault file itself. The agent already has
@@ -109,6 +110,15 @@ local function render_layout()
 end
 
 local function render()
+    -- chart/layout rendering doesn't go through AIO's line-based UI, so it
+    -- doesn't participate in the launcher's automatic "show first line when
+    -- folded" behavior the way ui:show_lines() does -- fold left the full
+    -- chart/layout visible. on_resume_when_folding (metadata above) makes
+    -- on_resume fire on every fold/unfold, so render explicitly nothing here.
+    if ui:is_folded() then
+        ui:show_text("")
+        return
+    end
     local mode = prefs.panel_mode or "text"
     if mode == "chart" then render_chart()
     elseif mode == "layout" then render_layout()

@@ -11,7 +11,22 @@ import android.provider.DocumentsContract
 import android.view.View
 import android.widget.RemoteViews
 
-class ObsidianWidgetProvider : AppWidgetProvider() {
+/**
+ * Confirmed on-device: AIO Launcher's script API only reliably delivers
+ * live update notifications (on_app_widget_updated) to the FIRST AIO tile
+ * bound to a given provider component -- a second obsidian-note.lua-style
+ * wrapper bound to this SAME class stays frozen on its very first
+ * (unconfigured) render forever, no matter how many times the underlying
+ * Android widget is correctly reconfigured and re-pushed (checked
+ * directly via ACTION_DUMP_STATE every time -- the stored config was
+ * always right; only AIO's own tile never re-rendered). ObsidianWidgetProvider2/
+ * 3/4 exist so each "content slot" gets its own distinct component identity
+ * instead of sharing this one -- open + trivial empty subclasses, since the
+ * actual behavior needs zero duplication once every provider-class
+ * reference below reads it from the runtime type (javaClass) instead of
+ * hardcoding ObsidianWidgetProvider directly.
+ */
+open class ObsidianWidgetProvider : AppWidgetProvider() {
 
     companion object {
         private const val ACTION_REFRESH = "com.obsidianwidget.ACTION_REFRESH"
@@ -64,13 +79,26 @@ class ObsidianWidgetProvider : AppWidgetProvider() {
         const val EXTRA_WIDGET_ID = "extra_widget_id"
         const val EXTRA_URL = "extra_url"
 
-        fun updateAllWidgets(context: Context) {
-            val intent = Intent(context, ObsidianWidgetProvider::class.java).apply {
+        // Every provider class an AIO "content slot" wrapper can bind to.
+        // Widget ids are globally unique across all of them, so nothing
+        // else needs to know which specific one owns a given id.
+        val ALL_PROVIDER_CLASSES: List<Class<out AppWidgetProvider>> = listOf(
+            ObsidianWidgetProvider::class.java,
+            ObsidianWidgetProvider2::class.java,
+            ObsidianWidgetProvider3::class.java,
+            ObsidianWidgetProvider4::class.java,
+        )
+
+        fun updateAllWidgets(
+            context: Context,
+            providerClass: Class<out AppWidgetProvider> = ObsidianWidgetProvider::class.java
+        ) {
+            val intent = Intent(context, providerClass).apply {
                 action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
             }
             val appWidgetManager = AppWidgetManager.getInstance(context)
             val widgetIds = appWidgetManager.getAppWidgetIds(
-                ComponentName(context, ObsidianWidgetProvider::class.java)
+                ComponentName(context, providerClass)
             )
             intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, widgetIds)
             context.sendBroadcast(intent)
@@ -97,7 +125,7 @@ class ObsidianWidgetProvider : AppWidgetProvider() {
         super.onReceive(context, intent)
 
         when (intent.action) {
-            ACTION_REFRESH -> updateAllWidgets(context)
+            ACTION_REFRESH -> updateAllWidgets(context, javaClass)
             ACTION_EDIT -> {
                 val widgetId = intent.getIntExtra(EXTRA_WIDGET_ID, -1)
                 val notePath = intent.getStringExtra("note_path")
@@ -161,7 +189,12 @@ class ObsidianWidgetProvider : AppWidgetProvider() {
     private fun dumpState(context: Context) {
         val vaultUri = VaultManager(context).vaultUri ?: return
         val appWidgetManager = AppWidgetManager.getInstance(context)
-        val ids = appWidgetManager.getAppWidgetIds(ComponentName(context, ObsidianWidgetProvider::class.java))
+        // Merge every provider class's widgets into one listing -- which
+        // specific class hosts a given id is an internal detail the agent
+        // doesn't need; only the widget_id matters for ACTION_CONFIGURE.
+        val ids = ALL_PROVIDER_CLASSES.flatMap { cls ->
+            appWidgetManager.getAppWidgetIds(ComponentName(context, cls)).toList()
+        }
 
         val arr = org.json.JSONArray()
         for (id in ids) {
@@ -268,7 +301,7 @@ class ObsidianWidgetProvider : AppWidgetProvider() {
             views.setRemoteAdapter(R.id.widget_checklist, serviceIntent)
 
             // Set up pending intent template for item clicks (toggle)
-            val toggleIntent = Intent(context, ObsidianWidgetProvider::class.java).apply {
+            val toggleIntent = Intent(context, javaClass).apply {
                 action = ACTION_TOGGLE
                 putExtra(EXTRA_WIDGET_ID, appWidgetId)
             }
@@ -371,7 +404,7 @@ class ObsidianWidgetProvider : AppWidgetProvider() {
     }
 
     private fun createActionIntent(context: Context, action: String, appWidgetId: Int): PendingIntent {
-        val intent = Intent(context, ObsidianWidgetProvider::class.java).apply {
+        val intent = Intent(context, javaClass).apply {
             this.action = action
             putExtra(EXTRA_WIDGET_ID, appWidgetId)
         }
@@ -471,3 +504,10 @@ class ObsidianWidgetProvider : AppWidgetProvider() {
         }
     }
 }
+
+// Empty on purpose -- see the comment on ObsidianWidgetProvider. Each gives
+// AIO's Lua wrapper (obsidian-slot-N.lua) a distinct component to bind to
+// so its live updates get tracked independently of the others.
+class ObsidianWidgetProvider2 : ObsidianWidgetProvider()
+class ObsidianWidgetProvider3 : ObsidianWidgetProvider()
+class ObsidianWidgetProvider4 : ObsidianWidgetProvider()

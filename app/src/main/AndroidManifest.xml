@@ -60,6 +60,45 @@
                 android:resource="@xml/widget_info" />
         </receiver>
 
+        <!-- ObsidianWidgetProvider2/3/4: same behavior (empty subclasses),
+             separate components so a second/third/fourth AIO content-slot
+             wrapper gets tracked independently; see the class comment. -->
+        <receiver
+            android:name=".ObsidianWidgetProvider2"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.obsidianwidget.ACTION_TOGGLE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_2" />
+        </receiver>
+
+        <receiver
+            android:name=".ObsidianWidgetProvider3"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.obsidianwidget.ACTION_TOGGLE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_3" />
+        </receiver>
+
+        <receiver
+            android:name=".ObsidianWidgetProvider4"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.obsidianwidget.ACTION_TOGGLE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_4" />
+        </receiver>
+
         <activity
             android:name=".AgentChatActivity"
             android:label="Agent"

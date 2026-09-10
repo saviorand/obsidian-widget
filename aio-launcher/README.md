@@ -151,6 +151,22 @@ scoped per clone rather than colliding. Separate files sidestep that
 uncertainty entirely — `prefs` is already known to be scoped per script
 file, so each slot's own widget id can never collide with another's.
 
+**Each slot also binds a separate provider component**
+(`ObsidianWidgetProvider2`/`3`/`4` in the app, empty subclasses of
+`ObsidianWidgetProvider` — see that class's doc comment). This isn't
+optional: confirmed on-device that AIO's Lua wrapper only reliably
+delivers live update notifications (`on_app_widget_updated`) to the
+*first* tile bound to a given provider. A second `widgets:setup()` call
+against the *same* provider from a different script gets a real,
+correctly-configured native widget (verified directly via
+`ACTION_DUMP_STATE` every time) that nonetheless never visually updates
+past its first, unconfigured render — no error, it just silently never
+refreshes, which took a long debugging session to pin down. Because of
+this, `ACTION_CONFIGURE`/`ACTION_REFRESH` for a given slot's widget must
+target the *matching* provider component, not always
+`.ObsidianWidgetProvider` — `obsidian-slot-2.lua` -> `.ObsidianWidgetProvider2`,
+etc. `ACTION_DUMP_STATE` merges all four regardless of which one you ask.
+
 Adding a 5th+ slot later is the same recipe: copy `obsidian-note.lua`,
 change the `-- name =` line, import it.
 
