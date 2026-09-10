@@ -107,6 +107,14 @@
             android:exported="false"
             android:permission="android.permission.BIND_REMOTEVIEWS" />
 
+        <receiver
+            android:name=".AioBridgeReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.obsidianwidget.aio.ACTION_REPORT" />
+            </intent-filter>
+        </receiver>
+
     </application>
 
 </manifest>

@@ -15,6 +15,19 @@ longer term, be added/removed/reordered by an agent driving AIO itself.
   a widget's view tree (`bridge:dump_tree()`/`dump_colors()`/`snapshot()`)
   so a new wrapper can find the right `resource_id`s. Needs AIO's newer
   `bridge:snapshot()`/`click_handle()` APIs (AIO 7.5.0-beta2+ confirmed).
+- `obsidian-controller.lua` — not a widget wrapper either. Exposes
+  `aio:add_widget/remove_widget/move_widget/fold_widget()` to `am
+  broadcast`, so an agent can rearrange the home screen itself (add,
+  remove, reorder, fold any already-imported widget or script — including
+  AIO's own built-ins, not just this app's three wrappers), not just
+  reconfigure a widget that's already placed. See its own header comment
+  for the exact command shape and setup step (AIO Settings -> Tasker ->
+  Remote API). Current state (available + active widgets) is reported back
+  into the vault as `.aio-layout-state.json` via `AioBridgeReceiver` — a
+  small generic write-back sink in the app (`app/src/main/java/com/
+  obsidianwidget/AioBridgeReceiver.kt`) that any script can use to persist
+  arbitrary state Android/AIO owns but this app has no other way to
+  observe.
 
 ## How this works
 
@@ -59,7 +72,8 @@ be dropped straight into AIO's own directory. Instead:
   reconfigure via `ACTION_CONFIGURE` broadcasts instead (see the vault's
   `CLAUDE.md`). Title tap opens the in-app editor rather than deep-linking
   into real Obsidian.
-- No composability script yet for AIO's `aio:add_widget/remove_widget/
-  move_widget/fold_widget()` — that's the remaining piece for an agent to
-  add/remove/reorder widgets on the home screen itself, not just
-  reconfigure existing ones.
+- `obsidian-controller.lua` can't import a brand-new script — only
+  add/remove/move/fold widgets and scripts already known to AIO (imported
+  once via AIO Store's Add Script picker). A genuinely new custom widget
+  (e.g. one that renders some new kind of data) still needs one human tap
+  to import before the agent can place or reconfigure it.
