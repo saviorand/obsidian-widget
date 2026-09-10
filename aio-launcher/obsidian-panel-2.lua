@@ -11,9 +11,15 @@
 -- shown and pushes the finished result here in one broadcast. Three modes,
 -- selected by the first line of the pushed command:
 --
+-- IMPORTANT: the identifier AIO routes on_command by is the script's
+-- literal FILENAME including the ".lua" extension -- "obsidian-panel-2.lua"
+-- below, not "Panel 1" (confirmed on-device; contradicts what AIO's own
+-- samples/tasker-widget-control.lua implies). Same identifier
+-- obsidian-controller.lua's add/remove/move/fold ops expect.
+--
 -- TEXT (default, no prefix) -- title + body lines, HTML tags allowed:
 --   am broadcast -a ru.execbit.aiolauncher.COMMAND \
---     --es cmd "script:panel 1:<title>
+--     --es cmd "script:obsidian-panel-2.lua:<title>
 -- <body line 1>
 -- <body line 2>"
 --   A leading "@<vault-relative-path>" line makes the whole panel tappable
@@ -22,7 +28,7 @@
 -- CHART -- a real line chart (AIO's ui:show_chart), JSON on the rest of
 -- the line after "chart:":
 --   am broadcast -a ru.execbit.aiolauncher.COMMAND \
---     --es cmd 'script:panel 1:chart:{"points":[[1700000000000,3],[1700086400000,5]],"format":"x:date y:number","title":"Tasks done","show_grid":true}'
+--     --es cmd 'script:obsidian-panel-2.lua:chart:{"points":[[1700000000000,3],[1700086400000,5]],"format":"x:date y:number","title":"Tasks done","show_grid":true}'
 --   points are [timestamp_ms, value] pairs; format/title/show_grid optional.
 --
 -- LAYOUT -- AIO's full declarative rich-UI element language (see
@@ -36,7 +42,7 @@
 -- Lua table, so a spec written to match the gui{} examples in
 -- README_RICH_UI.md works with no translation:
 --   am broadcast -a ru.execbit.aiolauncher.COMMAND \
---     --es cmd 'script:panel 1:layout:{"elements":[["text","<b>Tasks</b>",{"size":20}],["new_line",2],["progress","Today",{"progress":70}],["new_line",2],["button","Open Todo",{"color":"#00aa00"}]],"actions":{"3":"@Todo.md"}}'
+--     --es cmd 'script:obsidian-panel-2.lua:layout:{"elements":[["text","<b>Tasks</b>",{"size":20}],["new_line",2],["progress","Today",{"progress":70}],["new_line",2],["button","Open Todo",{"color":"#00aa00"}]],"actions":{"3":"@Todo.md"}}'
 --   "actions" maps a 1-based element index (matching on_click's argument)
 --   to "@<vault-relative-path>" to open on tap -- only elements you list
 --   there are clickable in a way that does anything.

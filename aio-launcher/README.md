@@ -5,6 +5,17 @@ that host this app's real native widgets inside AIO's home-screen surface,
 so the same widgets can sit alongside AIO's other scriptable widgets and,
 longer term, be added/removed/reordered by an agent driving AIO itself.
 
+**Gotcha, confirmed by hours of on-device testing**: `obsidian-controller.lua`'s
+`am broadcast` remote-command routing and `aio:add_widget/remove_widget/
+move_widget/fold_widget()` both identify a script by its literal
+**filename, including the `.lua` extension** (e.g. `obsidian-panel-2.lua`)
+— not the script's declared `-- name =` title, despite AIO's own
+`samples/tasker-widget-control.lua` implying otherwise. Getting this wrong
+looks exactly like the command silently doing nothing (no error, no
+crash) — a wildcard target (`script:*:<data>`) reaches every script's
+`on_command` regardless of name and is the fastest way to confirm basic
+routing works before chasing why a specific name doesn't match.
+
 - `obsidian-note.lua` — wraps `ObsidianWidgetProvider` (checklist / plain-text
   note). Tapping a checklist row toggles it; tapping the title opens the
   full editor.

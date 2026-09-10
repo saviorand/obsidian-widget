@@ -7,13 +7,29 @@
 -- One-time setup this script can't do for itself:
 --   AIO Settings -> Tasker -> Remote API -> enable it, note the password.
 -- (This is AIO's own remote-control gate, unrelated to the real Tasker app —
--- no Tasker install needed to use it this way.)
+-- no Tasker install needed to use it this way.) On a device with no
+-- password set, omit --es password entirely.
 --
--- Command shape (matches AIO's own samples/tasker-widget-control.lua):
+-- Command shape:
 --
 --   am broadcast -a ru.execbit.aiolauncher.COMMAND \
---     --es cmd "script:obsidian controller:<op>=:=<name>=:=<arg>" \
---     --es password <remote-api-password>
+--     --es cmd "script:obsidian-controller.lua:<op>=:=<name>=:=<arg>"
+--
+-- IMPORTANT, confirmed by testing on-device (contradicts AIO's own
+-- samples/tasker-widget-control.lua, whose comment implies the script's
+-- declared "-- name =" title, lowercased, is the routing key -- that
+-- never worked here): the identifier AIO actually routes on_command by
+-- is the script's literal FILENAME, including the ".lua" extension --
+-- e.g. "obsidian-controller.lua", not "Obsidian Controller" or
+-- "obsidian controller". A wildcard target ("script:*:<data>") reaches
+-- every script's on_command regardless of name and is useful for
+-- confirming routing works at all before chasing a specific name.
+--
+-- This is also the exact string aio:add_widget/remove_widget/move_widget/
+-- fold_widget() expect as <widget-name> below (confirmed against
+-- aio:available_widgets()'s "name" field: AIO's own built-ins get short
+-- internal ids like "weather", but every script -- including this one --
+-- is listed by its filename+extension).
 --
 -- Ops:
 --   add=:=<widget-name>=:=[position]   add an already-imported widget/script
@@ -22,12 +38,10 @@
 --   fold=:=<widget-name>=:=<true|false>
 --   list=:=                            no-op; just refreshes the report below
 --
--- <widget-name> is aio:available_widgets()'s internal `name` field, not the
--- display title — run `list` once and read .aio-layout-state.json (written
--- into the vault by AioBridgeReceiver) to find the exact names on this
--- device before scripting further changes. That file also lists every
--- widget already available to add, including AIO's own built-ins, not just
--- this app's three wrappers.
+-- Run `list` once and read .aio-layout-state.json (written into the vault
+-- by AioBridgeReceiver) for the exact, authoritative name/position/folded
+-- state of everything AIO knows about -- including its own built-ins, not
+-- just this app's scripts -- before scripting further changes.
 --
 -- Scope: this only rearranges widgets/scripts AIO already knows about (an
 -- import still needs one human tap in AIO Store's Add Script picker — no
@@ -35,7 +49,7 @@
 -- not a way to smuggle in unreviewed code.
 
 local REPORT_ACTION = "com.obsidianwidget.aio.ACTION_REPORT"
-local REPORT_RECEIVER = "com.obsidianwidget/.AioBridgeReceiver"
+local REPORT_RECEIVER = "com.obsidianwidget/com.obsidianwidget.AioBridgeReceiver"
 
 local last_status = "Controller ready"
 
@@ -117,9 +131,19 @@ end
 -- add/remove/move on the real home screen), not just via on_command.
 function on_widget_action(action, name)
     last_status = tostring(action) .. " " .. tostring(name) .. " (manual)"
+    ui:show_text(last_status)
     report()
 end
 
-function on_load() report() end
-function on_resume() report() end
+-- A widget stays on AIO's loading placeholder forever until something
+-- actually calls a ui:show_* function -- report() alone (just a broadcast,
+-- no UI call) never did, which was the "stuck on loading" bug.
+function on_load()
+    ui:show_text(last_status)
+    report()
+end
+function on_resume()
+    ui:show_text(last_status)
+    report()
+end
 function on_click() ui:show_text(last_status) end
