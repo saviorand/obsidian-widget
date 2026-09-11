@@ -170,6 +170,60 @@ principle, the better fit for a checklist you want to tap individual
 items on — but see that section for why there's really only one that
 works reliably.
 
+**Spawn panels on demand, don't pre-provision and fold them.** A folded
+widget still reserves a visible row — that's AIO's own chrome, not
+something script code controls — so a panel that isn't currently needed
+should be `remove`d via the controller, not folded, to actually reclaim
+the space. Confirmed on-device: a panel's pushed content (`prefs`)
+survives a remove + later re-add, since it's tied to the script file, not
+any widget instance, so nothing is lost. The one exception is
+`obsidian-controller.lua` itself, which must stay permanently active
+(folded, never removed) — removing it leaves nothing to route a future
+`add` command to, and recovering from that needs a manual re-add through
+AIO's own UI, not `am broadcast`.
+
+## Search-bar chat (`obsidian-agent-search.lua`)
+
+A `type = "search"` script (no home-screen footprint at all) that shows a
+"Chat with Agent" button under any typed query and switches into AIO's
+built-in chat UI on tap (`search:chat_start()`/`on_chat()`). This is the
+main way the user talks to the agent now, ahead of the `AgentWidgetProvider`
+chat widget.
+
+The interesting constraint: AIO's Lua sandbox has no blocking network
+call — `http:post()` is async-callback only (`on_network_result`), and
+there's no documented way to append a message into an already-open chat
+session started with `chat_start()`. Confirmed on-device that calling
+`chat_start()` *again* from `on_network_result` does successfully inject
+the new reply into the visible conversation — that's what makes this
+work at all, despite not being documented behavior.
+
+Depends on a second endpoint added to `agent-host.mjs` alongside its
+WebSocket protocol, since panels/search scripts can't hold a socket open
+across a multi-second turn:
+
+```
+POST http://127.0.0.1:8178/chat
+{"prompt": "...", "sessionId": "..."}   // sessionId optional, omit for a fresh session
+->
+{"reply": "...", "sessionId": "..."}    // once the whole turn completes -- no streaming
+```
+
+Reuses the same `claude -p` spawn logic as the WebSocket path; buffers
+the visible text across `stream-json` events instead of forwarding them
+one at a time. `agent-host.mjs` must be running (`~/agent-host/control.sh
+start`) — same dependency as the panel `agent:` verb, same silent-failure
+mode if it's down.
+
+**Known gap, not yet built**: no streaming/progress visibility — the
+script shows "Thinking..." as a placeholder and then the final reply,
+nothing in between. Closing that gap needs `agent-host.mjs`'s `/chat` to
+become job-based (`POST /chat/start` returns an id immediately, `GET
+/chat/status/<id>` returns partial state) so the script can poll it via
+`timer:start()`/`on_tick()` instead of blocking. `AgentChatActivity.kt`/
+`AgentManager.kt` are the reference for full parity (streaming, session
+history, MiMo fallback).
+
 ## Content slots — and why there's really only one
 
 `obsidian-note.lua` handles "present some vault content" fully
