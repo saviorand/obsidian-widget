@@ -24,7 +24,8 @@
 --     --es cmd '{"mode":"chart","points":[[ts_ms,value],...],"format":"x:date y:number","title":"...","show_grid":true,"action":"open:X.md"}'
 --
 --   am broadcast -a ru.execbit.aiolauncher.COMMAND \
---     --es cmd '{"mode":"layout","elements":[["text","<b>Tasks</b>",{"size":20}],["new_line",2],["button","Open Todo",{"color":"#00aa00"}]],"actions":{"2":"open:Todo.md"}}'
+--     --es cmd '{"mode":"layout","elements":[["text","<b>Tasks</b>",{"size":20}],["new_line",2],["button","Open Todo",{"color":"#00aa00"}]],"actions":{"3":"open:Todo.md"}}'
+--   (index 3, not 2 -- see the click-index note below)
 --
 --   am broadcast -a ru.execbit.aiolauncher.COMMAND --es cmd '{"mode":"clear"}'
 --
@@ -42,9 +43,19 @@
 -- coercion error for a JSON-decoded tuple, even though AIO's own docs
 -- show the bare 2-item form as valid (only true for a native Lua literal).
 --
+-- CLICK INDEX, confirmed on-device (easy to get wrong -- cost a long
+-- debugging session): `actions` keys count EVERY entry in `elements`
+-- positionally, 1-based, INCLUDING new_line/spacer -- not just the
+-- "real" (text/button/icon/progress) ones. For
+-- elements = [text, new_line, button], the button is index 3, not 2 and
+-- not 1 (there's no "skip the layout-only entries" numbering). Count
+-- your own array's positions by hand, or push a throwaway version first
+-- and check which index actually fires (on_click(idx) -- log/toast idx
+-- if unsure) before assuming a guessed index is right.
+--
 -- ACTION VOCABULARY -- text/chart get one `action` (the whole panel is
--- the tap target); layout gets `actions`, a map from 1-based element
--- index (matching on_click's argument) to the same verb:arg strings:
+-- the tap target); layout gets `actions`, a map from the 1-based
+-- positional index above to the same verb:arg strings:
 --
 --   open:<vault-relative-path>       opens that note in the real editor
 --   broadcast:<json>                 sends an arbitrary Android broadcast,

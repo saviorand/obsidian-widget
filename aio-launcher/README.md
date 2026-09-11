@@ -114,8 +114,14 @@ am broadcast -a ru.execbit.aiolauncher.COMMAND \
   `["text","..."]` — confirmed on-device that omitting it throws a LuaJ
   coercion error from `gui{}`'s internals for a JSON-decoded tuple, even
   though the equivalent bare 2-item Lua table literal is valid and
-  demonstrated in AIO's own docs. `actions` maps a 1-based element index
-  (matching `gui{}`'s own click numbering) to an action string.
+  demonstrated in AIO's own docs. `actions` maps a 1-based index to an
+  action string — **the index counts every entry in `elements`
+  positionally, including `new_line`/`spacer`, not just the "real"
+  elements** — confirmed on-device after this cost real debugging time.
+  For `elements = [text, new_line, button]`, the button is index 3, not
+  2. Count array positions by hand, or push a throwaway version first and
+  check which index actually fires (a temporary `debug:toast` in
+  `on_click(idx)` is the fastest way), before trusting a guessed index.
 - `{"mode":"clear"}` — resets to the placeholder state.
 
 **Actions** (`action`/`actions` values, `<verb>:<arg>`, identical
@@ -150,6 +156,11 @@ regardless of mode or tap target):
   reply shown anywhere — the receiving agent should act, not just
   respond conversationally, since nobody's watching a chat transcript
   for this kind of prompt (it arrives prefixed `[Home screen: <panel>]`).
+  Needs `agent-host.mjs` actually running (it's off by default to save
+  battery — see `~/agent-host/control.sh`); a tap while it's down fails
+  the WebSocket connection silently, same as the chat widget showing
+  "offline" — confirmed on-device as the cause of an apparently-broken
+  trigger that was really just a stopped daemon.
 
 This is not a live web renderer: RemoteViews-style Android widgets and
 AIO's own script sandbox both exclude WebView, so literal React/Ant
