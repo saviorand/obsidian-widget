@@ -2,6 +2,16 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Lets ACTION_EDIT/AgentTriggerReceiver start an activity from a
+         plain background broadcast (a panel tap, an am broadcast, an
+         agent-triggered action). Android 10+ otherwise silently blocks
+         startActivity() from a BroadcastReceiver unless the app holds
+         this permission or the launch was a genuine, system-recognized
+         user tap (e.g. a real widget's PendingIntent via
+         bridge:click_handle(), which is why that path never needed it).
+         Requires one manual grant: Settings > Apps > Obsidian Widget >
+         Display over other apps. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <queries>
         <package android:name="md.obsidian" />

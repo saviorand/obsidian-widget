@@ -125,8 +125,17 @@ regardless of mode or tap target):
   (reuses `EditNoteActivity` via `ObsidianWidgetProvider`'s
   `ACTION_EDIT`, extended with an optional `note_path` extra since a
   panel has no bound widget instance to key off). The general "edit
-  arbitrary files" mechanism — reliable, doesn't touch the native-widget
-  bridge at all.
+  arbitrary files" mechanism — doesn't touch the native-widget bridge at
+  all, but needs the `SYSTEM_ALERT_WINDOW` permission ("Display over
+  other apps") granted once in Android settings. Confirmed on-device:
+  Android 10+ silently blocks `startActivity()` from a `BroadcastReceiver`
+  triggered by a plain background broadcast — which is exactly what a
+  panel tap or `am broadcast` both are, as opposed to a real widget's
+  `PendingIntent` fired via `bridge:click_handle()` (which is why *that*
+  path never needed this and always just worked). No error, no crash —
+  the broadcast arrives and the right code runs, the activity just never
+  appears. `SYSTEM_ALERT_WINDOW`-holding apps are exempt from this
+  restriction (the same mechanism automation apps like Tasker rely on).
 - `broadcast:<json>` — sends an arbitrary Android broadcast:
   `{"action":"...","component":"...","extras":{...}}` (`component`
   optional). Covers "effects/call an API" generally — anything reachable
