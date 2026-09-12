@@ -23,21 +23,37 @@
         android:layout_marginBottom="12dp" />
 
     <TextView
+        android:id="@+id/main_vault_status"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Add the widget to your home screen,\nthen tap the ⚙ icon to configure it."
+        android:text="No vault selected yet"
         android:textColor="@color/obsidian_text_secondary"
         android:textSize="15sp"
-        android:lineSpacingExtra="4dp"
         android:gravity="center"
+        android:layout_marginBottom="16dp" />
+
+    <Button
+        android:id="@+id/main_select_vault"
+        android:layout_width="wrap_content"
+        android:layout_height="44dp"
+        android:minHeight="0dp"
+        android:background="@drawable/button_background"
+        android:text="Choose vault folder"
+        android:textColor="@color/white"
+        android:textSize="14sp"
+        android:textAllCaps="false"
+        android:fontFamily="sans-serif-medium"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp"
         android:layout_marginBottom="32dp" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Long-press your home screen → Widgets → Obsidian Widget"
+        android:text="This grants every widget's vault access at once. After that, add a widget from Long-press home screen → Widgets → Obsidian Widget (or via your Lua launcher's script picker)."
         android:textColor="@color/obsidian_text_secondary"
         android:textSize="12sp"
+        android:lineSpacingExtra="4dp"
         android:gravity="center"
         android:alpha="0.6" />
 
