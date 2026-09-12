@@ -60,7 +60,8 @@
 
         <receiver
             android:name=".ObsidianWidgetProvider"
-            android:exported="true">
+            android:exported="true"
+            android:label="@string/widget_label_slot1">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="com.obsidianwidget.ACTION_TOGGLE" />
@@ -72,10 +73,18 @@
 
         <!-- ObsidianWidgetProvider2/3/4: same behavior (empty subclasses),
              separate components so a second/third/fourth AIO content-slot
-             wrapper gets tracked independently; see the class comment. -->
+             wrapper gets tracked independently; see the class comment.
+             Each receiver's own android:label + widget_info's own
+             description are what a picker actually shows: without them
+             all four looked identical (same app-level label, same shared
+             description string), confirmed on-device as "6 obsidian widget
+             entries, can't tell which is which" (that's these four plus
+             notes-browser and agent, which already had distinct
+             descriptions but no distinct label). -->
         <receiver
             android:name=".ObsidianWidgetProvider2"
-            android:exported="true">
+            android:exported="true"
+            android:label="@string/widget_label_slot2">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="com.obsidianwidget.ACTION_TOGGLE" />
@@ -87,7 +96,8 @@
 
         <receiver
             android:name=".ObsidianWidgetProvider3"
-            android:exported="true">
+            android:exported="true"
+            android:label="@string/widget_label_slot3">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="com.obsidianwidget.ACTION_TOGGLE" />
@@ -99,7 +109,8 @@
 
         <receiver
             android:name=".ObsidianWidgetProvider4"
-            android:exported="true">
+            android:exported="true"
+            android:label="@string/widget_label_slot4">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="com.obsidianwidget.ACTION_TOGGLE" />
@@ -119,7 +130,8 @@
 
         <receiver
             android:name=".AgentWidgetProvider"
-            android:exported="true">
+            android:exported="true"
+            android:label="obsidian-agent">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
@@ -142,7 +154,8 @@
 
         <receiver
             android:name=".NotesWidgetProvider"
-            android:exported="true">
+            android:exported="true"
+            android:label="obsidian-notes">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>

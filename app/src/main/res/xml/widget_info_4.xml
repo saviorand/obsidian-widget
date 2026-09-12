@@ -10,6 +10,6 @@
     android:widgetCategory="home_screen"
     android:widgetFeatures="reconfigurable"
     android:previewLayout="@layout/widget_layout"
-    android:description="@string/widget_description"
+    android:description="@string/widget_description_slot4"
     android:targetCellWidth="3"
     android:targetCellHeight="2" />

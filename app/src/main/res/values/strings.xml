@@ -2,6 +2,20 @@
 <resources>
     <string name="app_name">Obsidian Widget</string>
     <string name="widget_description">Show daily notes and quick capture for Obsidian</string>
+    <!-- ObsidianWidgetProvider/2/3/4 are identical in behavior (see the
+         class comment on ObsidianWidgetProvider) but were indistinguishable
+         in any widget picker: same app-level label, same description, on
+         every one of the four. These give each "content slot" (CLAUDE.md's
+         term) its own name and description, matching the slot numbering
+         obsidian-note.lua/obsidian-slot-2/3/4.lua already use. -->
+    <string name="widget_label_slot1">obsidian-note</string>
+    <string name="widget_label_slot2">obsidian-slot-2</string>
+    <string name="widget_label_slot3">obsidian-slot-3</string>
+    <string name="widget_label_slot4">obsidian-slot-4</string>
+    <string name="widget_description_slot1">Daily/pinned note + checklist — bound by obsidian-note.lua. The only slot that reliably live-updates through AIO (see CLAUDE.md).</string>
+    <string name="widget_description_slot2">Daily/pinned note + checklist — bound by obsidian-slot-2.lua.</string>
+    <string name="widget_description_slot3">Daily/pinned note + checklist — bound by obsidian-slot-3.lua.</string>
+    <string name="widget_description_slot4">Daily/pinned note + checklist — bound by obsidian-slot-4.lua.</string>
     <string name="widget_title">Daily Note</string>
     <string name="no_vault_selected">Tap to select your Obsidian vault</string>
     <string name="no_daily_note">No daily note found</string>
