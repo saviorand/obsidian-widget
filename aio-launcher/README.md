@@ -86,13 +86,24 @@ be dropped straight into AIO's own directory. Instead:
 
 ## Panels — one unified surface for content and interactivity
 
+**Status, 2026-09-16: real and working, but no longer the default.**
+This was the answer through Sep 10–11 to "a clean, unified, powerful
+surface the agent can drive end-to-end" — but once concrete features
+arrived (the Telegram inbox widget was the first), the actual choice was
+a dedicated script per concern instead, each with its own logic rather
+than a shared generic content-push slot. See "Query-backed widgets"
+below for the current default when a widget needs live data, and the
+vault's `CLAUDE.md` ("Driving the home screen") for the full current
+ordering. Kept here, unedited otherwise, because the mechanism itself is
+still correct for genuinely one-off/ad hoc content that doesn't justify
+its own script — just not the first thing to reach for anymore.
+
 `obsidian-panel-1/2/3/4.lua` have no native widget binding at all — they
 render whatever the agent last pushed via `am broadcast`, and dispatch
-taps through one small, general action vocabulary. This is the actual
-answer to "a clean, unified, powerful surface the agent can drive
-end-to-end" — one JSON envelope, three content modes, three action
-verbs, covering display, file editing, arbitrary effects, and anything
-needing real judgment, all with the same shape:
+taps through one small, general action vocabulary. One JSON envelope,
+three content modes, three action verbs, covering display, file editing,
+arbitrary effects, and anything needing real judgment, all with the same
+shape:
 
 ```
 am broadcast -a ru.execbit.aiolauncher.COMMAND \
@@ -275,6 +286,48 @@ a default.
 
 Adding a 5th+ slot later is the same recipe: copy `obsidian-note.lua`,
 change the `-- name =` line, import it.
+
+## Query-backed widgets — the current default for live KB data
+
+A dedicated `.lua` script (see "Deploying a script" above), not a panel,
+talking to `scrolls-host.mjs`'s `WIDGETS` registry
+(`GET http://127.0.0.1:8137/widgets/:name`) — the same already-running,
+boot-started process the Obsidian plugin's WebSocket/LSP connection uses,
+sharing one `http.Server` (WS upgrade vs. plain GET is dispatched by the
+`ws` library, both work off one listener). `obsidian-dashboard.lua` is
+the reference example.
+
+**Adding a new one is a few lines in `scrolls-host.mjs`, not a new
+process**: an entry in `WIDGETS` (files to query — glob at request time,
+not a hardcoded list, so a renamed/added domain file needs no edit here
+— domain, query name(s), a `format(rows)` function returning
+`{mode, title, body, action}`), then a script that `http:get`s it on
+`on_resume`/`on_alarm` and renders the response directly (same envelope
+shape a panel would render, so there's nothing new to learn there).
+
+Deliberately a plain subprocess call (`glibc-runner scrolls query`,
+~0.8s measured, no proot-distro) rather than reusing the WS/LSP session
+underneath — a query is a one-shot stateless question, and coupling its
+failure modes to whatever `scrolls lsp` child a WS client happens to
+have open would buy nothing. Revisit only if that tradeoff stops being
+right (many widgets, or one needing sub-second latency), not
+speculatively.
+
+**A standalone bridge process per widget was tried and reverted** —
+`dashboard-bridge.py`, built once for exactly the dashboard widget, torn
+down the same day once the registry route made it redundant. Don't
+repeat that shape: check `scrolls-host.mjs`'s `WIDGETS` registry (KB
+queries) or `agent-host.mjs` (anything needing real judgment) before
+building a new persistent process for a new widget.
+
+**If the widget needs a live non-KB data source instead** (a persistent
+connection, credentials, push events) — `tg-bridge.py` is the reference:
+its own small process, loopback-only HTTP, a paired bearer token
+(`/pair`, unauthenticated on purpose, loopback binding is the real
+boundary) the widget caches itself rather than hardcoding. That's a
+genuinely different shape of problem from a KB query and does warrant
+its own process — the distinction is "does this need to hold state or a
+connection open," not "is it a widget."
 
 ## Known v1 gaps
 
