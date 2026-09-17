@@ -137,7 +137,7 @@ end
 -- ── open the full source note ───────────────────────────────────────────────
 
 local function open_note()
-  local path = (spec and spec.action or ""):match("^open:(.*)$") or "self/dashboard.s.md"
+  local path = (spec and spec.action or ""):match("^open:(.*)$") or "personal/dashboard.s.md"
   intent:send_broadcast{
     action = "com.obsidianwidget.ACTION_EDIT",
     component = "com.obsidianwidget/com.obsidianwidget.ObsidianWidgetProvider",
