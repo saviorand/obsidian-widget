@@ -315,10 +315,33 @@ the content-slot scripts, for the same underlying reason.
 not a new process or script**: an entry in `WIDGETS` (files to query —
 glob at request time, not a hardcoded list, so a renamed/added domain
 file needs no edit here — domain, query name(s), a `format(rows)`
-function returning `{mode, title, body, action}`; `listWidget(...)`
+function returning `{mode, title, body, action, rows}`; `listWidget(...)`
 covers the common "list one query's concepts" shape in one line). It
 shows up in the picker automatically the next time `/widgets` is
 fetched — no script change needed to add a new choice.
+
+**Per-row tap targets, via `has link`**: `rows` is `{text, action}[]`,
+one entry per displayed line, built by joining that widget's row query
+against `dashboard.s.md`'s `#| query: links` (`*a concept* has link *a
+value*.`, declared in `shared.s.md` so every KB file gets it for free).
+`obsidian-query-widget.lua` renders straight from `rows` when present
+(so each line's click index maps 1:1 to its own action) and falls back
+to the flat `body`/`action` pair for a widget format that doesn't set
+`rows`, or a cached envelope from before this existed. Three action
+shapes `open_action()` understands, in the KB fact's own quoted value:
+
+| value | opens |
+|---|---|
+| `"https://..."` | the system browser (`system:open_browser()`) |
+| `"open:<vault-relative-path>"` | the lightweight quick-edit modal (`ACTION_EDIT`) — the default for a row with no `has link` fact of its own |
+| `"note:<vault-relative-path>"` | full Obsidian, via its own `obsidian://open` deep link (`intent:open_uri()`) — the same mechanism `ObsidianWidgetProvider.kt`'s `ACTION_OPEN` uses internally for a bound widget's pinned/daily note, generalized here to an arbitrary path |
+
+`note:`'s deep link hardcodes the vault name (`OBSIDIAN_VAULT` at the
+top of `obsidian-query-widget.lua`) since there's no way to read the
+Android app's own stored `vault_name` preference from a Lua script —
+update that constant if the vault is ever renamed inside Obsidian.
+Most concepts have no `has link` fact at all; that's the expected common
+case; the fallback keeps every existing widget working unchanged.
 
 Deliberately a plain subprocess call (`glibc-runner scrolls query`,
 ~0.8s measured, no proot-distro) rather than reusing the WS/LSP session
