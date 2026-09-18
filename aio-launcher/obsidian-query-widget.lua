@@ -9,9 +9,13 @@
 -- Talks to scrolls-host.mjs's WIDGETS registry (127.0.0.1:8137) -- the
 -- same already-running process the Obsidian plugin's WS/LSP connection
 -- uses. GET /widgets lists what's registered; GET /widgets/:name returns
--- a ready-to-render envelope {mode,title,body,action}. See that file's
--- own header for how to add a new query there -- a registry entry, not
--- a new process or script.
+-- a ready-to-render envelope {mode,title,body,action,rows}. `rows` is
+-- `{text,action}[]`, one per displayed line, letting a specific KB fact
+-- (`*a concept* has link *a value*.` in shared.s.md) send an individual
+-- row's tap to its own note/URL instead of always opening the widget's
+-- source file; `body`/`action` stay as the whole-widget fallback for rows
+-- with no link of their own. See that file's own header for how to add a
+-- new query there -- a registry entry, not a new process or script.
 --
 -- Picks ONE query at a time (prefs.query_name, default "dashboard-urgent")
 -- -- tap the gear line to change it. For a SECOND, independently
@@ -41,9 +45,10 @@ local NET_FILE   = "kb_query_net.txt"     -- survives AIO's Lua resets between e
 local RETRY_FILE = "kb_query_retry.txt"   -- retry counter for the list fetch, see do_list()
 local MAX_LIST_RETRIES = 2  -- a single retry wasn't enough headroom for the cold-connection hiccup below
 
-local spec = nil          -- {mode, title, body, action}
+local spec = nil          -- {mode, title, body, action, rows}
 local dialog_open = false
 local settings_idx = nil  -- click index of the trailing "gear" line, set by render()
+local first_row_idx = nil -- click index of the first spec.rows[] line, set by render()
 
 local I = {
   warn = "%%fa:triangle-exclamation%%",
@@ -125,12 +130,26 @@ function render()
   ui:set_title("KB Query")
 
   local lines
+  first_row_idx = nil
   if spec == nil then
     lines = { "<b>KB Query</b>", fmt.secondary("(loading…)") }
   else
     lines = { "<b>" .. (spec.title or "KB Query") .. "</b>" }
-    for _, l in ipairs(split_lines(spec.body)) do
-      table.insert(lines, l)
+    if type(spec.rows) == "table" and #spec.rows > 0 then
+      -- Built straight from spec.rows[], not split_lines(spec.body), so
+      -- each line's click index maps 1:1 to spec.rows -- a per-row tap
+      -- target (a linked URL or note) needs that correspondence to hold.
+      first_row_idx = #lines + 1
+      for _, r in ipairs(spec.rows) do
+        table.insert(lines, r.text or "")
+      end
+    else
+      -- A cached envelope from before per-row actions existed (or a
+      -- widget format that never sets rows) has no rows -- fall back to
+      -- the flat body text, same as always.
+      for _, l in ipairs(split_lines(spec.body)) do
+        table.insert(lines, l)
+      end
     end
   end
   table.insert(lines, fmt.secondary(I.gear .. "  " .. query_name() .. " · change"))
@@ -139,10 +158,22 @@ function render()
   ui:show_lines(lines)
 end
 
--- ── open the full source note ───────────────────────────────────────────────
+-- ── open a row's (or the widget's default) tap target ───────────────────────
 
-local function open_note()
-  local path = (spec and spec.action or ""):match("^open:(.*)$") or "personal/dashboard.s.md"
+-- Two action shapes a server-side `has link` fact (or the widget's own
+-- default) can produce: `"open:<vault-relative-path>"` for a note via the
+-- Obsidian widget plugin's own broadcast, or a bare `https://...` URL for
+-- an external link via the system browser. Anything else (missing, or a
+-- scheme this doesn't recognize) falls back to the dashboard note, same
+-- default this always had before per-row actions existed.
+local function open_action(action)
+  action = action or ""
+  local url = action:match("^(https?://.+)$")
+  if url then
+    system:open_browser(url)
+    return
+  end
+  local path = action:match("^open:(.*)$") or "personal/dashboard.s.md"
   intent:send_broadcast{
     action = "com.obsidianwidget.ACTION_EDIT",
     component = "com.obsidianwidget/com.obsidianwidget.ObsidianWidgetProvider",
@@ -181,7 +212,14 @@ function on_click(idx)
     do_list()
     return
   end
-  open_note()
+  if first_row_idx and type(spec) == "table" and type(spec.rows) == "table" then
+    local row = spec.rows[idx - first_row_idx + 1]
+    if row then
+      open_action(row.action)
+      return
+    end
+  end
+  open_action(spec and spec.action)
 end
 
 function on_network_result_fetch(body, code)
