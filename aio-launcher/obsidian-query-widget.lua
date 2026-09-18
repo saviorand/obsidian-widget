@@ -224,12 +224,14 @@ function on_network_result_list(body, code)
   if not ok or type(decoded) ~= "table" or type(decoded.names) ~= "table" then return end
   files:write(NAMES_FILE, json.encode(decoded.names))
   dialog_open = true
-  -- search=false: with only ~13 fixed entries a search box isn't earning
-  -- its keep, and it was the likely cause of the picker appearing to stay
-  -- open after a tap -- AIO has no explicit dialog-dismiss call, so a
-  -- search box's keyboard focus lingering after the dialog itself closes
-  -- underneath it is indistinguishable from "didn't close" to the user.
-  dialogs:show_list_dialog({ title = "Choose a query", lines = decoded.names, search = false })
+  -- `ui:show_list_dialog`, not `dialogs:show_list_dialog` -- confirmed
+  -- against AIO's own sample scripts (samples/list_dialog_sample.lua,
+  -- check-new-api-sample.lua) and changelog ("4.5.0 ... added
+  -- ui:show_list_dialog()"): list dialogs live on `ui`, not `dialogs`.
+  -- This script was the only place in the whole local scripts corpus
+  -- calling it under `dialogs:` -- the likely actual cause of "picker
+  -- doesn't close on selection", not the search-box theory tried first.
+  ui:show_list_dialog({ title = "Choose a query", lines = decoded.names, search = false })
 end
 
 function on_network_error_list(msg)
