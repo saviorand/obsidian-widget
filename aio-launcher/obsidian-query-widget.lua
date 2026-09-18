@@ -224,7 +224,12 @@ function on_network_result_list(body, code)
   if not ok or type(decoded) ~= "table" or type(decoded.names) ~= "table" then return end
   files:write(NAMES_FILE, json.encode(decoded.names))
   dialog_open = true
-  dialogs:show_list_dialog({ title = "Choose a query", lines = decoded.names, search = true })
+  -- search=false: with only ~13 fixed entries a search box isn't earning
+  -- its keep, and it was the likely cause of the picker appearing to stay
+  -- open after a tap -- AIO has no explicit dialog-dismiss call, so a
+  -- search box's keyboard focus lingering after the dialog itself closes
+  -- underneath it is indistinguishable from "didn't close" to the user.
+  dialogs:show_list_dialog({ title = "Choose a query", lines = decoded.names, search = false })
 end
 
 function on_network_error_list(msg)
