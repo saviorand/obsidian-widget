@@ -150,12 +150,18 @@ end
 function on_load()
   load_local()
   render()
+  set_net_state("idle")  -- a resumed process shouldn't trust a flag a crashed/killed one left set
   do_fetch()
 end
 
 function on_resume()
   load_local()
   render()
+  -- The user actively looking at the widget is itself a strong enough signal
+  -- to override a stuck flag -- if a previous fetch's callback never landed
+  -- (e.g. mid-restart on the bridge side), do_fetch()'s "already busy" guard
+  -- would otherwise wedge forever with no way to self-heal.
+  set_net_state("idle")
   do_fetch()
 end
 
