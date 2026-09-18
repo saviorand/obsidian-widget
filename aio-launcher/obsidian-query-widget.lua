@@ -38,7 +38,8 @@ local DEFAULT_QUERY = "dashboard-urgent"
 local LOCAL_FILE = "kb_query_local.json"  -- last-known envelope, survives a fetch failure
 local NAMES_FILE = "kb_query_names.json"  -- last-fetched picker list, durable across resets
 local NET_FILE   = "kb_query_net.txt"     -- survives AIO's Lua resets between entry points
-local RETRY_FILE = "kb_query_retry.txt"   -- one-shot retry flag for the list fetch, see do_list()
+local RETRY_FILE = "kb_query_retry.txt"   -- retry counter for the list fetch, see do_list()
+local MAX_LIST_RETRIES = 2  -- a single retry wasn't enough headroom for the cold-connection hiccup below
 
 local spec = nil          -- {mode, title, body, action}
 local dialog_open = false
@@ -88,16 +89,20 @@ local function do_fetch()
   http:get(BRIDGE .. "/widgets/" .. query_name(), "fetch")
 end
 
--- One automatic retry on failure, no user-visible delay -- observed
+-- Automatic retries on failure, no user-visible delay -- observed
 -- on-device: the first loopback HTTP call in a while occasionally times
 -- out or errors on Android's client side even though the server answers
 -- instantly every time (confirmed via server-side request logging, every
 -- /widgets call got a 200) -- a cold-connection hiccup, not a real
--- failure. A second attempt right after always succeeds.
-local function do_list(is_retry)
+-- failure. One retry wasn't consistently enough to clear it (confirmed:
+-- user still saw "bridge unreachable" on the first tap and had to tap
+-- again by hand) -- MAX_LIST_RETRIES gives it more headroom before
+-- actually giving up.
+local function do_list(retry_count)
+  retry_count = retry_count or 0
   if get_net_state() ~= "idle" then return end
   set_net_state("list")
-  files:write(RETRY_FILE, is_retry and "1" or "0")
+  files:write(RETRY_FILE, tostring(retry_count))
   http:get(BRIDGE .. "/widgets", "list")
 end
 
@@ -201,9 +206,9 @@ function on_network_error_fetch(msg)
 end
 
 local function list_failed()
-  local retried = files:read(RETRY_FILE) == "1"
-  if not retried then
-    do_list(true)
+  local retry_count = tonumber(files:read(RETRY_FILE)) or 0
+  if retry_count < MAX_LIST_RETRIES then
+    do_list(retry_count + 1)
     return
   end
   ui:show_toast("Couldn't load query list (bridge unreachable?)")
