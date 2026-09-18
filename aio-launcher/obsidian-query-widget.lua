@@ -220,18 +220,25 @@ function on_network_result_list(body, code)
     list_failed()
     return
   end
+  -- Guard against a stacked second dialog: http:get() has no cancel, so a
+  -- slow original request and a retry it triggered can BOTH eventually
+  -- land as separate success callbacks. If a picker is already up from an
+  -- earlier one, a second show_list_dialog() call stacks underneath it --
+  -- tapping the top one closes it and reveals the second, which looks
+  -- exactly like "the picker didn't close."
+  if dialog_open then return end
   local ok, decoded = pcall(json.decode, body)
   if not ok or type(decoded) ~= "table" or type(decoded.names) ~= "table" then return end
   files:write(NAMES_FILE, json.encode(decoded.names))
   dialog_open = true
-  -- `ui:show_list_dialog`, not `dialogs:show_list_dialog` -- confirmed
-  -- against AIO's own sample scripts (samples/list_dialog_sample.lua,
-  -- check-new-api-sample.lua) and changelog ("4.5.0 ... added
-  -- ui:show_list_dialog()"): list dialogs live on `ui`, not `dialogs`.
-  -- This script was the only place in the whole local scripts corpus
-  -- calling it under `dialogs:` -- the likely actual cause of "picker
-  -- doesn't close on selection", not the search-box theory tried first.
-  ui:show_list_dialog({ title = "Choose a query", lines = decoded.names, search = false })
+  -- `dialogs:show_list_dialog`, not `ui:show_list_dialog` -- the on-device
+  -- app itself flags `ui:show_list_dialog` as deprecated at runtime, and
+  -- the current upstream README (github.com/zobnin/aiolauncher_scripts)
+  -- documents it under the `dialogs` module. The `ui:` form only appears
+  -- in that repo's older sample scripts, which the README/CHANGELOG don't
+  -- otherwise corroborate as current -- a previous pass here got this
+  -- backwards on first read; the runtime warning is the ground truth.
+  dialogs:show_list_dialog({ title = "Choose a query", lines = decoded.names, search = false })
 end
 
 function on_network_error_list(msg)
