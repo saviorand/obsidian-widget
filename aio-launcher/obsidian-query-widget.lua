@@ -160,17 +160,52 @@ end
 
 -- ── open a row's (or the widget's default) tap target ───────────────────────
 
--- Two action shapes a server-side `has link` fact (or the widget's own
--- default) can produce: `"open:<vault-relative-path>"` for a note via the
--- Obsidian widget plugin's own broadcast, or a bare `https://...` URL for
--- an external link via the system browser. Anything else (missing, or a
--- scheme this doesn't recognize) falls back to the dashboard note, same
--- default this always had before per-row actions existed.
+-- The vault name Obsidian's own URI scheme needs -- checked against
+-- ObsidianWidgetProvider.kt's own openObsidian(): it always builds
+-- obsidian://open?vault=<vaultName>&file=<path> from a stored preference
+-- rather than omitting `vault` and relying on "last active vault"
+-- default behavior, so this matches that same deliberate choice rather
+-- than a guess. Update this if the vault is ever renamed inside Obsidian.
+local OBSIDIAN_VAULT = "brain-storage"
+
+-- RFC 3986 unreserved chars pass through; everything else (spaces,
+-- slashes -- slashes DO need encoding here, they're part of `file`'s
+-- value, not a URI path separator) becomes %XX.
+local function url_encode(s)
+  return (s:gsub("([^%w%-%_%.%~])", function(c)
+    return string.format("%%%02X", string.byte(c))
+  end))
+end
+
+-- Three action shapes a server-side `has link` fact (or the widget's own
+-- default) can produce:
+--   * a bare `https://...` URL -- the system browser.
+--   * `"open:<vault-relative-path>"` -- the widget's own lightweight
+--     quick-edit modal (ObsidianWidgetProvider's ACTION_EDIT), the
+--     existing default for "tap a row with no link of its own."
+--   * `"note:<vault-relative-path>"` -- launches full Obsidian via its
+--     own obsidian://open deep link (ACTION_VIEW), for when a fact wants
+--     the real app rather than the modal. Deliberately a distinct prefix
+--     from `open:` rather than changing that default everywhere: most
+--     rows still want the lightweight modal, and a `has link` fact can
+--     opt a specific concept into the heavier "actually switch apps"
+--     behavior instead.
+-- Anything else (missing, or a scheme this doesn't recognize) falls back
+-- to the dashboard note via the quick-edit modal, same default this
+-- always had before per-row actions existed.
 local function open_action(action)
   action = action or ""
   local url = action:match("^(https?://.+)$")
   if url then
     system:open_browser(url)
+    return
+  end
+  local note_path = action:match("^note:(.*)$")
+  if note_path then
+    intent:open_uri(
+      "obsidian://open?vault=" .. url_encode(OBSIDIAN_VAULT)
+        .. "&file=" .. url_encode(note_path)
+    )
     return
   end
   local path = action:match("^open:(.*)$") or "personal/dashboard.s.md"
