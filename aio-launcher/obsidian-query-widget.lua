@@ -179,7 +179,10 @@ end
 
 -- Three action shapes a server-side `has link` fact (or the widget's own
 -- default) can produce:
---   * a bare `https://...` URL -- the system browser.
+--   * a `https://t.me/...` or `tg://...` link -- the Telegram app itself
+--     (a VIEW intent aimed at it), not the browser, which would only show
+--     t.me's "open in Telegram" page.
+--   * any other bare `https://...` URL -- the system browser.
 --   * `"open:<vault-relative-path>"` -- the widget's own lightweight
 --     quick-edit modal (ObsidianWidgetProvider's ACTION_EDIT), the
 --     existing default for "tap a row with no link of its own."
@@ -195,6 +198,14 @@ end
 -- always had before per-row actions existed.
 local function open_action(action)
   action = action or ""
+  if action:match("^https://t%.me/") or action:match("^tg://") then
+    intent:start_activity{
+      action = "android.intent.action.VIEW",
+      data = action,
+      package = "org.telegram.messenger",
+    }
+    return
+  end
   local url = action:match("^(https?://.+)$")
   if url then
     system:open_browser(url)
@@ -240,6 +251,17 @@ function on_alarm()
   do_fetch()
 end
 
+-- `script:obsidian-query-widget.lua:refresh` over AIO's Remote API -- sent
+-- by scrolls-host when what a widget would show has changed (the inbox's
+-- background tick), so new content appears without waiting for the home
+-- screen to resume or the 30-minute alarm.
+function on_command(data)
+  if data == "refresh" then
+    set_net_state("idle")
+    do_fetch()
+  end
+end
+
 function on_click(idx)
   if ui:is_folded() then return end
   if idx == 1 then return end  -- title line
@@ -260,7 +282,16 @@ end
 function on_network_result_fetch(body, code)
   set_net_state("idle")
   if code ~= 200 then
-    ui:show_text(I.warn .. "  bridge unreachable (" .. tostring(code) .. ")")
+    -- NOT the same as on_network_error_fetch below: the bridge answered,
+    -- just with an error (most often "unknown widget" after a server-side
+    -- rename) -- there's nothing wrong with the connection. show_text()
+    -- used to run here, which draws a bare string with no gear line (only
+    -- render() ever adds one) -- so a query name that stopped resolving
+    -- left no way to open the picker and fix it without editing prefs by
+    -- hand. render() instead keeps whatever's cached (title, rows, gear)
+    -- on screen and navigable; the toast is just a transient heads-up.
+    ui:show_toast(I.warn .. "  bridge error (" .. tostring(code) .. ")")
+    render()
     return
   end
   local ok, decoded = pcall(json.decode, body)
