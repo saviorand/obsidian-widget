@@ -1,10 +1,14 @@
--- name = "KB Query Widget"
--- description = "Pick any registered KB query and show its live results"
+-- name = "Obsidian Digest"
+-- description = "Daily digest summary (copy of obsidian-query-widget.lua)"
 -- type = "widget"
 -- foldable = "true"
 -- on_resume_when_folding = "true"
 -- author = "Val"
 -- version = "1.0"
+-- GENERATED copy of obsidian-query-widget.lua, so the digest is a second,
+-- independent widget (AIO scripts aren't clonable). Its default query
+-- ("digest") and cache file names come from this file's own name.
+-- Regenerate after changing the original: bash make-digest-widget.sh
 
 -- Talks to scrolls-host.mjs's WIDGETS registry (127.0.0.1:8137) -- the
 -- same already-running process the Obsidian plugin's WS/LSP connection
